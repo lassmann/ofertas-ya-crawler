@@ -1,0 +1,38 @@
+{
+  "name": "ofertas-ya-crawler",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/jobs/scrape-all.ts",
+    "scrape": "tsx src/jobs/scrape-all.ts",
+    "scrape:superseis": "tsx src/scrapers/supermercados/superseis.ts",
+    "scrape:superseis:ofertas": "tsx src/scrapers/supermercados/superseis.ts --ofertas",
+    "scrape:superseis:save": "tsx src/scrapers/supermercados/superseis.ts --save",
+    "scrape:superseis:ofertas:save": "tsx src/scrapers/supermercados/superseis.ts --ofertas --save",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "db:studio": "prisma studio",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "stats": "tsx src/scripts/stats.ts"
+  },
+  "devDependencies": {
+    "@types/cheerio": "^0.22.35",
+    "@types/node": "^25.0.10",
+    "@types/pg": "^8.16.0",
+    "prisma": "^7.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.17"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.3.0",
+    "@prisma/client": "^7.3.0",
+    "cheerio": "^1.1.2",
+    "dotenv": "^17.2.3",
+    "pg": "^8.17.2",
+    "playwright": "^1.57.0"
+  }
+}

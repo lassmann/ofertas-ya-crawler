@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Supermercados y tiendas
+model Store {
+  id            String    @id @default(uuid())
+  name          String    @unique
+  slug          String    @unique
+  type          StoreType
+  logoUrl       String?
+  websiteUrl    String?
+  promotionsUrl String?
+  isActive      Boolean   @default(true)
+  lastScrapedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  products   Product[]
+  prices     Price[]
+  promotions Promotion[]
+}
+
+enum StoreType {
+  SUPERMERCADO
+  FARMACIA
+  RESTAURANTE
+  ELECTRONICA
+  OTRO
+}
+
+model Product {
+  id             String   @id @default(uuid())
+  name           String
+  normalizedName String
+  brand          String?
+  category       String?
+  subcategory    String?
+  unit           String?
+  quantity       Float?
+  barcode        String?  @unique
+  imageUrl       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  store   Store  @relation(fields: [storeId], references: [id])
+  storeId String
+  prices  Price[]
+
+  @@unique([storeId, normalizedName])
+  @@index([normalizedName])
+  @@index([storeId])
+}
+
+model Price {
+  id        String   @id @default(uuid())
+  price     Decimal  @db.Decimal(10, 2)
+  oldPrice  Decimal? @db.Decimal(10, 2)
+  currency  String   @default("PYG")
+  sourceUrl String?
+  scrapedAt DateTime @default(now())
+
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+  store     Store   @relation(fields: [storeId], references: [id])
+  storeId   String
+
+  @@index([productId, scrapedAt])
+  @@index([storeId, scrapedAt])
+}
+
+model Bank {
+  id              String    @id @default(uuid())
+  name            String    @unique
+  slug            String    @unique
+  logoUrl         String?
+  websiteUrl      String?
+  promotionsUrl   String?
+  instagramHandle String?
+  isActive        Boolean   @default(true)
+  lastScrapedAt   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  promotions Promotion[]
+}
+
+model Promotion {
+  id              String       @id @default(uuid())
+  title           String
+  description     String?
+  discountPercent Int?
+  discountAmount  Decimal?     @db.Decimal(10, 2)
+  discountType    DiscountType
+
+  cardTypes   String[]
+  minPurchase Decimal? @db.Decimal(10, 2)
+  maxDiscount Decimal? @db.Decimal(10, 2)
+  daysOfWeek  Int[]
+
+  validFrom DateTime
+  validTo   DateTime
+
+  sourceUrl  String?
+  imageUrl   String?
+  termsUrl   String?
+  isVerified Boolean @default(false)
+  isActive   Boolean @default(true)
+
+  viewsCount  Int @default(0)
+  clicksCount Int @default(0)
+
+  scrapedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bank    Bank?   @relation(fields: [bankId], references: [id])
+  bankId  String?
+  store   Store?  @relation(fields: [storeId], references: [id])
+  storeId String?
+
+  @@index([validFrom, validTo])
+  @@index([bankId])
+  @@index([storeId])
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  CUOTAS_SIN_INTERES
+  CASHBACK
+  OTRO
+}
+
+model PromotionDuplicate {
+  id              String   @id @default(uuid())
+  promotionId1    String
+  promotionId2    String
+  similarityScore Float
+  isSamePromotion Boolean?
+  confirmedBy     String?
+  createdAt       DateTime @default(now())
+
+  @@unique([promotionId1, promotionId2])
+}
