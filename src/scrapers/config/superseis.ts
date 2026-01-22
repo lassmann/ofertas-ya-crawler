@@ -1,53 +1,55 @@
+import { Category } from './categories'
+
 export const superseisConfig = {
   name: 'Superseis',
   slug: 'superseis',
   baseUrl: 'https://www.superseis.com.py',
-  
+
   routes: {
-    ofertas: { path: '/ofertas/es-es', category: 'ofertas' },
-    almacen: { path: '/catalog/almacen', category: 'almacen' },
-    bebidasConAlcohol: { path: '/catalog/bebidas-con-alcohol', category: 'bebidas-con-alcohol' },
-    carnes: { path: '/catalog/carnes', category: 'carnes' },
-    congelados: { path: '/catalog/Congelados', category: 'congelados' },
-    bebes: { path: '/catalog/bebes', category: 'bebes' },
-    bebidasSinAlcohol: { path: '/catalog/bebidas-sin-alcohol', category: 'bebidas-sin-alcohol' },
-    electrodomesticos: { path: '/catalog/electrodomesticos', category: 'electrodomesticos' },
-    ferreteria: { path: '/catalog/ferreteria', category: 'ferreteria' },
-    fiambreria: { path: '/catalog/fiambreria', category: 'fiambreria' },
-    frescos: { path: '/catalog/frescos', category: 'frescos' },
-    hogarYBazar: { path: '/catalog/hogar-y-bazar', category: 'hogar-y-bazar' },
-    juguetesYLibreria: { path: '/catalog/juguetes-y-libreria', category: 'juguetes-y-libreria' },
-    lacteos: { path: '/catalog/lacteos', category: 'lacteos' },
-    limpieza: { path: '/catalog/limpieza', category: 'limpieza' },
-    mascotas: { path: '/catalog/mascotas', category: 'mascotas' },
-    panaderia: { path: '/catalog/panaderia', category: 'panaderia' },
-    pastas: { path: '/catalog/pastas', category: 'pastas' },
-    perfumeria: { path: '/catalog/perfumeria', category: 'perfumeria' },
-    reposteria: { path: '/catalog/reposteria', category: 'reposteria' },
+    ofertas: { path: '/ofertas/es-es', category: Category.OFERTAS },
+    almacen: { path: '/catalog/almacen', category: Category.ALMACEN },
+    bebidasConAlcohol: { path: '/catalog/bebidas-con-alcohol', category: Category.BEBIDAS_CON_ALCOHOL },
+    carnes: { path: '/catalog/carnes', category: Category.CARNES },
+    congelados: { path: '/catalog/Congelados', category: Category.CONGELADOS },
+    bebes: { path: '/catalog/bebes', category: Category.BEBES },
+    bebidasSinAlcohol: { path: '/catalog/bebidas-sin-alcohol', category: Category.BEBIDAS_SIN_ALCOHOL },
+    electrodomesticos: { path: '/catalog/electrodomesticos', category: Category.ELECTRODOMESTICOS },
+    ferreteria: { path: '/catalog/ferreteria', category: Category.FERRETERIA },
+    fiambreria: { path: '/catalog/fiambreria', category: Category.FIAMBRERIA },
+    frescos: { path: '/catalog/frescos', category: Category.FRESCOS },
+    hogarYBazar: { path: '/catalog/hogar-y-bazar', category: Category.HOGAR_Y_BAZAR },
+    juguetesYLibreria: { path: '/catalog/juguetes-y-libreria', category: Category.JUGUETES_Y_LIBRERIA },
+    lacteos: { path: '/catalog/lacteos', category: Category.LACTEOS },
+    limpieza: { path: '/catalog/limpieza', category: Category.LIMPIEZA },
+    mascotas: { path: '/catalog/mascotas', category: Category.MASCOTAS },
+    panaderia: { path: '/catalog/panaderia', category: Category.PANADERIA },
+    pastas: { path: '/catalog/pastas', category: Category.PASTAS },
+    perfumeria: { path: '/catalog/perfumeria', category: Category.PERFUMERIA },
+    reposteria: { path: '/catalog/reposteria', category: Category.REPOSTERIA },
   },
 
   selectors: {
     // Contenedor de productos
     productContainer: '.product-thumb',
-    
+
     // Datos del producto
     name: 'h4 a[data-product-name]',
     nameAttr: 'data-product-name',
     url: 'h4 a',
     image: '.image img',
-    
+
     // Precios
     priceNew: '.price-new',
     priceOld: '.price-old',
-    
+
     // Descuento
     discountPercent: '.discount-percent-s6',
     savingsAmount: '.savings-tooltip',
-    
+
     // Metadata
     saleType: '.sale-type-badge',
     productId: '[data-product-id]',
-    
+
     // Paginación
     lastPage: '.page-item:last-child a',
     nextPage: '.nav-btn:not(.disabled)[href*="page="]',

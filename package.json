@@ -9,6 +9,8 @@
     "scrape:superseis:ofertas": "tsx src/scrapers/supermercados/superseis.ts --ofertas",
     "scrape:superseis:save": "tsx src/scrapers/supermercados/superseis.ts --save",
     "scrape:superseis:ofertas:save": "tsx src/scrapers/supermercados/superseis.ts --ofertas --save",
+    "scrape:fortis": "tsx src/scrapers/supermercados/fortis.ts",
+    "scrape:fortis:save": "tsx src/scrapers/supermercados/fortis.ts --save",
     "test": "vitest",
     "test:run": "vitest run",
     "db:push": "prisma db push",

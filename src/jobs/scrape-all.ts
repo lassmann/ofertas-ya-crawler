@@ -15,17 +15,17 @@ async function main() {
 
   for (const scraper of scrapers) {
     console.log(`\n[${scraper.name}] Iniciando...`)
-    
+
     try {
-      const result = await scraper.scrape()
-      
+      const result = await scraper.scrapeAll()
+
       if (result.success && result.data.length > 0) {
         console.log(`[${scraper.name}] Guardando ${result.data.length} productos...`)
         await scraper.saveProducts(result.data)
         console.log(`[${scraper.name}] ✓ Completado en ${result.duration}ms`)
       } else {
         console.log(`[${scraper.name}] ✗ Sin datos o con errores`)
-        result.errors.forEach(e => console.log(`  Error: ${e}`))
+        result.errors.forEach((e: string) => console.log(`  Error: ${e}`))
       }
     } catch (error) {
       console.error(`[${scraper.name}] Error fatal:`, error)
