@@ -11,6 +11,8 @@
     "scrape:superseis:ofertas:save": "tsx src/scrapers/supermercados/superseis.ts --ofertas --save",
     "scrape:fortis": "tsx src/scrapers/supermercados/fortis.ts",
     "scrape:fortis:save": "tsx src/scrapers/supermercados/fortis.ts --save",
+    "scrape:stock": "tsx src/scrapers/supermercados/stock.ts",
+    "scrape:stock:save": "tsx src/scrapers/supermercados/stock.ts --save",
     "test": "vitest",
     "test:run": "vitest run",
     "db:push": "prisma db push",
@@ -18,12 +20,16 @@
     "db:studio": "prisma studio",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
-    "stats": "tsx src/scripts/stats.ts"
+    "stats": "tsx src/scripts/stats.ts",
+    "compare": "tsx src/scripts/compare-prices.ts",
+    "compare:lacteos": "tsx src/scripts/compare-prices.ts --category=lacteos",
+    "compare:bebidas": "tsx src/scripts/compare-prices.ts --category=bebidas"
   },
   "devDependencies": {
     "@types/cheerio": "^0.22.35",
     "@types/node": "^25.0.10",
     "@types/pg": "^8.16.0",
+    "@types/string-similarity": "^4.0.2",
     "prisma": "^7.3.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
@@ -35,6 +41,7 @@
     "cheerio": "^1.1.2",
     "dotenv": "^17.2.3",
     "pg": "^8.17.2",
-    "playwright": "^1.57.0"
+    "playwright": "^1.57.0",
+    "string-similarity": "^4.0.4"
   }
 }
