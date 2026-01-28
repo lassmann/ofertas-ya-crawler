@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio'
 import { superseisConfig, type RouteKey } from '../config/superseis'
 import { db } from '../../lib/db.js'
+import { scraperLog, logger } from '../../lib/logger'
 import type { ScrapedProduct, ScraperResult } from '../../types/index'
 
 interface ScrapedProductWithCategory extends ScrapedProduct {
@@ -13,7 +14,7 @@ export class SuperseisScraper {
   get name() { return this.config.name }
   get slug() { return this.config.slug }
 
-  // Scrapear una ruta específica
+  // Scrape a specific route
   async scrapeRoute(routeKey: RouteKey): Promise<ScraperResult<ScrapedProductWithCategory>> {
     const startTime = Date.now()
     const allProducts: ScrapedProductWithCategory[] = []
@@ -25,28 +26,30 @@ export class SuperseisScraper {
       const { products, totalPages } = await this.scrapePage(firstPageUrl, route.category)
       allProducts.push(...products)
 
-      console.log(`[${this.name}] ${route.category} - Página 1/${totalPages} - ${products.length} productos`)
+      scraperLog.page(this.name, route.category, 1, products.length)
 
       for (let page = 2; page <= totalPages; page++) {
         try {
           const pageUrl = `${firstPageUrl}?page=${page}`
           const { products: pageProducts } = await this.scrapePage(pageUrl, route.category)
           allProducts.push(...pageProducts)
-          
-          console.log(`[${this.name}] ${route.category} - Página ${page}/${totalPages} - ${pageProducts.length} productos`)
-          
+
+          scraperLog.page(this.name, route.category, page, pageProducts.length)
+
           await this.delay(300)
         } catch (error) {
-          const msg = `Error en ${route.category} página ${page}: ${error instanceof Error ? error.message : 'Unknown'}`
+          const msg = `Error in ${route.category} page ${page}: ${error instanceof Error ? error.message : 'Unknown'}`
           errors.push(msg)
-          console.error(`[${this.name}] ${msg}`)
+          scraperLog.error(this.name, msg)
         }
       }
 
+      logger.success(`[${this.name}] ${route.category} - Total: ${allProducts.length} products in ${totalPages} pages`)
+
     } catch (error) {
-      const msg = `Error en ${route.category}: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      const msg = `Error in ${route.category}: ${error instanceof Error ? error.message : 'Unknown error'}`
       errors.push(msg)
-      console.error(`[${this.name}] ${msg}`)
+      scraperLog.error(this.name, msg)
     }
 
     return {
@@ -58,35 +61,54 @@ export class SuperseisScraper {
     }
   }
 
-  // Scrapear todas las rutas
-  async scrapeAll(options?: { 
-    includeOfertas?: boolean 
+  // Scrape all routes - BATCH MODE
+  async scrapeAll(options?: {
+    includeOfertas?: boolean
     onlyCategories?: RouteKey[]
   }): Promise<ScraperResult<ScrapedProductWithCategory>> {
     const startTime = Date.now()
     const allProducts: ScrapedProductWithCategory[] = []
     const allErrors: string[] = []
 
-    const routeKeys = options?.onlyCategories || 
+    const routeKeys = options?.onlyCategories ||
       (Object.keys(this.config.routes) as RouteKey[])
-    
+
     const routesToScrape = options?.includeOfertas === false
       ? routeKeys.filter(k => k !== 'ofertas')
       : routeKeys
 
-    console.log(`\n${'='.repeat(60)}`)
-    console.log(`[${this.name}] Iniciando scrape de ${routesToScrape.length} rutas`)
-    console.log(`${'='.repeat(60)}\n`)
+    const BATCH_SIZE = 3
+    const BATCH_DELAY_MS = 500
 
-    for (const routeKey of routesToScrape) {
-      const result = await this.scrapeRoute(routeKey)
-      allProducts.push(...result.data)
-      allErrors.push(...result.errors)
+    scraperLog.start(this.name, routesToScrape.length)
+    logger.info(`[${this.name}] Mode: ${BATCH_SIZE} in parallel, ${BATCH_DELAY_MS}ms between batches`)
 
-      console.log(`[${this.name}] ✓ ${routeKey}: ${result.data.length} productos\n`)
-      
-      // Pausa entre categorías
-      await this.delay(1000)
+    // Process in batches of 3
+    for (let i = 0; i < routesToScrape.length; i += BATCH_SIZE) {
+      const batch = routesToScrape.slice(i, i + BATCH_SIZE)
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1
+      const totalBatches = Math.ceil(routesToScrape.length / BATCH_SIZE)
+
+      scraperLog.batch(this.name, batchNum, totalBatches, batch)
+
+      // Execute batch in parallel
+      const results = await Promise.all(
+        batch.map(routeKey => this.scrapeRoute(routeKey))
+      )
+
+      // Add results
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j]
+        const routeKey = batch[j]
+        allProducts.push(...result.data)
+        allErrors.push(...result.errors)
+        scraperLog.route(this.name, routeKey, result.data.length)
+      }
+
+      // Delay between batches (except the last one)
+      if (i + BATCH_SIZE < routesToScrape.length) {
+        await this.delay(BATCH_DELAY_MS)
+      }
     }
 
     return {
@@ -98,7 +120,7 @@ export class SuperseisScraper {
     }
   }
 
-  // Scrapear solo ofertas (para uso rápido)
+  // Scrape offers only (for quick use)
   async scrapeOfertas(): Promise<ScraperResult<ScrapedProductWithCategory>> {
     return this.scrapeRoute('ofertas')
   }
@@ -128,12 +150,12 @@ export class SuperseisScraper {
     $(selectors.productContainer).each((_, element) => {
       const $el = $(element)
 
-      const name = $el.find(selectors.name).attr(selectors.nameAttr) || 
-                   $el.find(selectors.name).text().trim()
-      
+      const name = $el.find(selectors.name).attr(selectors.nameAttr) ||
+        $el.find(selectors.name).text().trim()
+
       const priceNew = parsePrice($el.find(selectors.priceNew).text())
       const priceOld = parsePrice($el.find(selectors.priceOld).text())
-      
+
       if (!name || !priceNew) return
 
       const product: ScrapedProductWithCategory = {
@@ -175,12 +197,12 @@ export class SuperseisScraper {
 
     let saved = 0
     let updated = 0
-    const seen = new Set<string>() // Para evitar duplicados en el mismo batch
+    const seen = new Set<string>() // To avoid duplicates in the same batch
 
     for (const product of products) {
       const normalizedName = this.normalizeName(product.name)
-      
-      // Skip si ya procesamos este producto en este batch
+
+      // Skip if we already processed this product in this batch
       if (seen.has(normalizedName)) continue
       seen.add(normalizedName)
 
@@ -222,7 +244,7 @@ export class SuperseisScraper {
           saved++
         }
 
-        // Crear registro de precio
+        // Create price record
         await db.price.create({
           data: {
             price: product.price,
@@ -234,7 +256,7 @@ export class SuperseisScraper {
         })
 
       } catch (error) {
-        console.error(`Error guardando "${product.name}":`, error)
+        logger.error(`Error saving "${product.name}":`, error)
       }
     }
 
@@ -262,14 +284,17 @@ if (isMainModule) {
   const args = process.argv.slice(2)
   const scraper = new SuperseisScraper()
 
-  // Parsear argumentos
+  // Parse arguments
   const onlyOfertas = args.includes('--ofertas')
   const saveToDb = args.includes('--save')
   const specificRoute = args.find(a => a.startsWith('--route='))?.split('=')[1] as RouteKey | undefined
 
-  console.log(`\n🛒 Superseis Scraper`)
-  console.log(`   Modo: ${onlyOfertas ? 'Solo ofertas' : specificRoute ? `Ruta: ${specificRoute}` : 'Todas las categorías'}`)
-  console.log(`   Guardar: ${saveToDb ? 'Sí' : 'No (usar --save para guardar)'}\n`)
+  logger.box([
+    `🛒 Superseis Scraper`,
+    ``,
+    `   Mode: ${onlyOfertas ? 'Offers only' : specificRoute ? `Route: ${specificRoute}` : 'All categories'}`,
+    `   Save: ${saveToDb ? 'Yes' : 'No (use --save to save)'}`,
+  ].join('\n'))
 
   let result: ScraperResult<ScrapedProductWithCategory>
 
@@ -281,30 +306,25 @@ if (isMainModule) {
     result = await scraper.scrapeAll()
   }
 
-  console.log(`\n${'='.repeat(60)}`)
-  console.log(`RESULTADO FINAL`)
-  console.log(`${'='.repeat(60)}`)
-  console.log(`- Éxito: ${result.success}`)
-  console.log(`- Productos totales: ${result.data.length}`)
-  console.log(`- Productos únicos: ${new Set(result.data.map(p => p.name)).size}`)
-  console.log(`- Errores: ${result.errors.length}`)
-  console.log(`- Duración: ${(result.duration / 1000 / 60).toFixed(1)} minutos`)
+  // Final summary
+  scraperLog.summary(scraper.name, {
+    total: result.data.length,
+    errors: result.errors.length,
+    duration: result.duration,
+  })
 
-  // Resumen por categoría
+  // Summary by category
   const byCategory = result.data.reduce((acc, p) => {
     acc[p.category] = (acc[p.category] || 0) + 1
     return acc
   }, {} as Record<string, number>)
-  
-  console.log(`\nProductos por categoría:`)
-  Object.entries(byCategory)
-    .sort((a, b) => b[1] - a[1])
-    .forEach(([cat, count]) => console.log(`  - ${cat}: ${count}`))
+
+  scraperLog.categories(scraper.name, byCategory)
 
   if (saveToDb && result.data.length > 0) {
-    console.log(`\n💾 Guardando en base de datos...`)
+    logger.start('Guardando en base de datos...')
     const { saved, updated } = await scraper.saveProducts(result.data)
-    console.log(`✓ Nuevos: ${saved} | Actualizados: ${updated}`)
+    scraperLog.saved(scraper.name, saved, updated)
   }
 
   await db.$disconnect()

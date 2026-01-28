@@ -1,4 +1,5 @@
 import { db } from '../lib/db'
+import { logger } from '../lib/logger'
 import stringSimilarity from 'string-similarity'
 
 interface ProductWithPrice {
@@ -23,7 +24,7 @@ interface ProductMatch {
 }
 
 async function getProductsWithLatestPrice(): Promise<ProductWithPrice[]> {
-  // Obtener el último precio de cada producto
+  // Get the latest price for each product
   const products = await db.product.findMany({
     include: {
       store: true,
@@ -57,24 +58,24 @@ function findMatches(
   const stores = [...new Set(products.map(p => p.storeSlug))]
 
   if (stores.length < 2) {
-    console.log('❌ Se necesitan al menos 2 tiendas para comparar')
+    logger.error('Need at least 2 stores to compare')
     return []
   }
 
-  // Agrupar productos por tienda
+  // Group products by store
   const byStore = stores.reduce((acc, slug) => {
     acc[slug] = products.filter(p => p.storeSlug === slug)
     return acc
   }, {} as Record<string, ProductWithPrice[]>)
 
-  // Comparar productos entre tiendas
+  // Compare products between stores
   const store1 = stores[0]
   const store2 = stores[1]
 
-  console.log(`\n🔍 Comparando ${byStore[store1].length} productos de ${store1} con ${byStore[store2].length} de ${store2}...\n`)
+  logger.info(`Comparing ${byStore[store1].length} products from ${store1} with ${byStore[store2].length} from ${store2}...`)
 
   for (const p1 of byStore[store1]) {
-    // Buscar el producto más similar en la otra tienda
+    // Find the most similar product in the other store
     const names2 = byStore[store2].map(p => p.normalizedName)
     const { bestMatch, bestMatchIndex } = stringSimilarity.findBestMatch(
       p1.normalizedName,
@@ -106,64 +107,70 @@ async function main() {
   const showTop = parseInt(args.find(a => a.startsWith('--top='))?.split('=')[1] || '20')
   const category = args.find(a => a.startsWith('--category='))?.split('=')[1]
 
-  console.log('📊 Comparador de Precios entre Supermercados')
-  console.log(`   Similitud mínima: ${(minSimilarity * 100).toFixed(0)}%`)
-  console.log(`   Mostrando top: ${showTop}`)
-  if (category) console.log(`   Categoría: ${category}`)
+  logger.box([
+    '📊 Price Comparator',
+    '',
+    `   Minimum similarity: ${(minSimilarity * 100).toFixed(0)}%`,
+    `   Showing top: ${showTop}`,
+    category ? `   Category: ${category}` : '',
+  ].filter(Boolean).join('\n'))
 
-  // Obtener productos
+  // Get products
   let products = await getProductsWithLatestPrice()
-  
+
   if (category) {
     products = products.filter(p => p.category?.toLowerCase().includes(category.toLowerCase()))
   }
 
-  console.log(`\n📦 Total productos: ${products.length}`)
+  logger.info(`Total products: ${products.length}`)
 
-  // Encontrar matches
+  // Find matches
   const matches = findMatches(products, minSimilarity)
 
-  console.log(`✅ Matches encontrados: ${matches.length}`)
+  logger.success(`Matches found: ${matches.length}`)
 
-  // Estadísticas generales
+  // General statistics
   const store1Cheaper = matches.filter(m => m.cheaper === 'store1').length
   const store2Cheaper = matches.filter(m => m.cheaper === 'store2').length
   const equal = matches.filter(m => m.cheaper === 'equal').length
 
   const stores = [...new Set(products.map(p => p.storeSlug))]
-  
-  console.log(`\n📈 Resumen:`)
-  console.log(`   ${stores[0]} más barato: ${store1Cheaper} productos`)
-  console.log(`   ${stores[1]} más barato: ${store2Cheaper} productos`)
-  console.log(`   Mismo precio: ${equal} productos`)
 
-  // Top diferencias de precio (ordenado por % de diferencia)
+  logger.box([
+    '📈 Summary',
+    '',
+    `   ${stores[0]} cheaper: ${store1Cheaper} products`,
+    `   ${stores[1]} cheaper: ${store2Cheaper} products`,
+    `   Same price: ${equal} products`,
+  ].join('\n'))
+
+  // Top price differences (sorted by % difference)
   const topDifferences = matches
     .filter(m => m.cheaper !== 'equal')
     .sort((a, b) => b.priceDiffPercent - a.priceDiffPercent)
     .slice(0, showTop)
 
-  console.log(`\n🏷️  Top ${showTop} mayores diferencias de precio:\n`)
-  console.log('─'.repeat(100))
+  logger.info(`🏷️  Top ${showTop} largest price differences:`)
+  logger.log('─'.repeat(80))
 
   topDifferences.forEach((match, i) => {
     const cheaper = match.cheaper === 'store1' ? match.product1 : match.product2
     const expensive = match.cheaper === 'store1' ? match.product2 : match.product1
 
-    console.log(`${i + 1}. ${match.product1.name}`)
-    console.log(`   Similitud: ${(match.similarity * 100).toFixed(0)}%`)
-    console.log(`   💚 ${cheaper.storeName}: ₲ ${cheaper.price.toLocaleString()}`)
-    console.log(`   💸 ${expensive.storeName}: ₲ ${expensive.price.toLocaleString()}`)
-    console.log(`   📉 Diferencia: ₲ ${match.priceDiff.toLocaleString()} (${match.priceDiffPercent.toFixed(1)}%)`)
-    console.log('─'.repeat(100))
+    logger.log(`${i + 1}. ${match.product1.name}`)
+    logger.log(`   Similarity: ${(match.similarity * 100).toFixed(0)}%`)
+    logger.log(`   💚 ${cheaper.storeName}: ₲ ${cheaper.price.toLocaleString()}`)
+    logger.log(`   💸 ${expensive.storeName}: ₲ ${expensive.price.toLocaleString()}`)
+    logger.log(`   📉 Difference: ₲ ${match.priceDiff.toLocaleString()} (${match.priceDiffPercent.toFixed(1)}%)`)
+    logger.log('─'.repeat(80))
   })
 
-  // Productos donde cada tienda es más barata
-  console.log(`\n\n🛒 MEJORES OFERTAS POR TIENDA\n`)
+  // Products where each store is cheaper
+  logger.box('🛒 BEST DEALS BY STORE')
 
   for (const storeSlug of stores) {
     const storeWins = matches
-      .filter(m => 
+      .filter(m =>
         (m.cheaper === 'store1' && m.product1.storeSlug === storeSlug) ||
         (m.cheaper === 'store2' && m.product2.storeSlug === storeSlug)
       )
@@ -171,18 +178,18 @@ async function main() {
       .slice(0, 5)
 
     const storeName = products.find(p => p.storeSlug === storeSlug)?.storeName
-    console.log(`\n📍 ${storeName} - Top 5 productos más baratos vs competencia:`)
-    
+    logger.info(`📍 ${storeName} - Top 5 cheapest products vs competition:`)
+
     storeWins.forEach((match, i) => {
       const ours = match.product1.storeSlug === storeSlug ? match.product1 : match.product2
       const theirs = match.product1.storeSlug === storeSlug ? match.product2 : match.product1
-      
-      console.log(`   ${i + 1}. ${ours.name}`)
-      console.log(`      Aquí: ₲ ${ours.price.toLocaleString()} | Otro: ₲ ${theirs.price.toLocaleString()} (-${match.priceDiffPercent.toFixed(1)}%)`)
+
+      logger.log(`   ${i + 1}. ${ours.name}`)
+      logger.log(`      Here: ₲ ${ours.price.toLocaleString()} | Other: ₲ ${theirs.price.toLocaleString()} (-${match.priceDiffPercent.toFixed(1)}%)`)
     })
   }
 
   await db.$disconnect()
 }
 
-main().catch(console.error)
+main().catch(logger.error)

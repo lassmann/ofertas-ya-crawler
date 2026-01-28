@@ -29,20 +29,20 @@ export const superseisConfig = {
   },
 
   selectors: {
-    // Contenedor de productos
+    // Product container
     productContainer: '.product-thumb',
 
-    // Datos del producto
+    // Product data
     name: 'h4 a[data-product-name]',
     nameAttr: 'data-product-name',
     url: 'h4 a',
     image: '.image img',
 
-    // Precios
+    // Prices
     priceNew: '.price-new',
     priceOld: '.price-old',
 
-    // Descuento
+    // Discount
     discountPercent: '.discount-percent-s6',
     savingsAmount: '.savings-tooltip',
 
@@ -50,12 +50,12 @@ export const superseisConfig = {
     saleType: '.sale-type-badge',
     productId: '[data-product-id]',
 
-    // Paginación
+    // Pagination
     lastPage: '.page-item:last-child a',
     nextPage: '.nav-btn:not(.disabled)[href*="page="]',
   },
 
-  // Parsear precio en guaraníes: "₲ 13.900" -> 13900
+  // Parse price in guaraníes: "₲ 13.900" -> 13900
   parsePrice: (text: string | null): number | null => {
     if (!text) return null
     const cleaned = text.replace(/[₲\s.]/g, '')
@@ -63,14 +63,14 @@ export const superseisConfig = {
     return isNaN(num) ? null : num
   },
 
-  // Parsear descuento: "- 35%" -> 35
+  // Parse discount: "- 35%" -> 35
   parseDiscount: (text: string | null): number | null => {
     if (!text) return null
     const match = text.match(/(\d+)/)
     return match ? parseInt(match[1], 10) : null
   },
 
-  // Extraer número de página de URL
+  // Extract page number from URL
   extractPageNumber: (url: string): number | null => {
     const match = url.match(/page=(\d+)/)
     return match ? parseInt(match[1], 10) : null

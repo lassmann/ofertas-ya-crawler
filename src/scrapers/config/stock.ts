@@ -45,26 +45,26 @@ export const stockConfig = {
         patePicadillo: { path: '/category/874-patepicadilloconservas.aspx', category: Category.ALMACEN },
         atunMariscos: { path: '/category/882-atunmariscossardinas.aspx', category: Category.ALMACEN },
 
-        // Golosinas
+        // Sweets
         galletitasPostres: { path: '/category/963-galletitaspostres.aspx', category: Category.GOLOSINAS },
         alfajores: { path: '/category/967-alfajores.aspx', category: Category.GOLOSINAS },
         caramelosChicles: { path: '/category/972-carameloschicles.aspx', category: Category.GOLOSINAS },
         chocolates: { path: '/category/968-chocolates.aspx', category: Category.GOLOSINAS },
         turrones: { path: '/category/971-turrones.aspx', category: Category.GOLOSINAS },
 
-        // Desayuno
+        // Breakfast
         cafe: { path: '/category/888-cafe.aspx', category: Category.DESAYUNO },
         te: { path: '/category/889-te.aspx', category: Category.DESAYUNO },
         yerba: { path: '/category/890-yerba.aspx', category: Category.DESAYUNO },
 
-        // Bebés
+        // Baby
         desechablesBebe: { path: '/category/226-bebes-perfumeria-desechables.aspx', category: Category.BEBES },
         toallitasHumedas: { path: '/category/230-bebes-perfumeria-toallitas-humedas.aspx', category: Category.BEBES },
         aceitesBebe: { path: '/category/222-bebes-perfumeria-aceites.aspx', category: Category.BEBES },
         capilaresBebe: { path: '/category/223-bebes-perfumeria-capilares.aspx', category: Category.BEBES },
         jabonesBebe: { path: '/category/227-bebes-perfumeria-jabones.aspx', category: Category.BEBES },
 
-        // Bebidas con alcohol
+        // Alcoholic beverages
         cervezaEstandar: { path: '/category/254-bebidas-alcoholicas-estandar.aspx', category: Category.BEBIDAS_CON_ALCOHOL },
         cervezaTerceraLinea: { path: '/category/265-bebidas-alcoholicas-tercera-linea.aspx', category: Category.BEBIDAS_CON_ALCOHOL },
         cervezaPremium: { path: '/category/260-bebidas-alcoholicas-premiun.aspx', category: Category.BEBIDAS_CON_ALCOHOL },
@@ -84,7 +84,7 @@ export const stockConfig = {
         champagne: { path: '/category/250-bebidas-alcoholicas-champagne.aspx', category: Category.BEBIDAS_CON_ALCOHOL },
         sidras: { path: '/category/262-bebidas-alcoholicas-sidras.aspx', category: Category.BEBIDAS_CON_ALCOHOL },
 
-        // Bebidas sin alcohol
+        // Non-alcoholic beverages
         aguasMineralizadas: { path: '/category/276-bebidas-no-alcoholicas-aguas-mineralizadas.aspx', category: Category.BEBIDAS_SIN_ALCOHOL },
         aperitivosSinAlcohol: { path: '/category/246-bebidas-alcoholicas-aperitivos-sin-alcohol.aspx', category: Category.BEBIDAS_SIN_ALCOHOL },
         energizantes: { path: '/category/278-bebidas-no-alcoholicas-energizantes.aspx', category: Category.BEBIDAS_SIN_ALCOHOL },
@@ -96,7 +96,7 @@ export const stockConfig = {
         jugosLiquidos: { path: '/category/283-bebidas-no-alcoholicas-liquido.aspx', category: Category.BEBIDAS_SIN_ALCOHOL },
         bebidasSoja: { path: '/category/285-bebidas-no-alcoholicas-soja.aspx', category: Category.BEBIDAS_SIN_ALCOHOL },
 
-        // Carnes
+        // Meats
         pollos: { path: '/category/618-perecedero-carnes-pollos.aspx', category: Category.CARNES },
         cerdoGranel: { path: '/category/608-perecedero-carnes-cerdo-granel.aspx', category: Category.CARNES },
         carnesGranel: { path: '/category/605-carnes-carnes-a-granel-lomito-tapa-rabadilla-todos-los-cortes-a-domicilio.aspx', category: Category.CARNES },
@@ -104,7 +104,7 @@ export const stockConfig = {
         carnesEnBandeja: { path: '/category/607-perecedero-carnes-carnes-en-bandeja.aspx', category: Category.CARNES },
         menudenciaVacuna: { path: '/category/611-perecedero-carnes-menudencia-vacuna.aspx', category: Category.CARNES },
 
-        // Congelados
+        // Frozen
         carneBlancaCongelada: { path: '/category/635-perecedero-congelados-a-base-de-carne-blanca.aspx', category: Category.CONGELADOS },
         comidasPreparadas: { path: '/category/646-perecedero-congelados-otras-comidas-preparadas.aspx', category: Category.CONGELADOS },
         pizzasCongeladas: { path: '/category/649-perecedero-congelados-pizzas-congeladas.aspx', category: Category.CONGELADOS },
@@ -115,7 +115,7 @@ export const stockConfig = {
         hamburguesaVacuna: { path: '/category/640-perecedero-congelados-hamburguesa-vacuna.aspx', category: Category.CONGELADOS },
         pescadosCongelados: { path: '/category/648-perecedero-congelados-pescados-congelados.aspx', category: Category.CONGELADOS },
 
-        // Fiambrería
+        // Deli
         embutidosDespacho: { path: '/category/655-perecedero-fiambreria-embutidos-al-despacho.aspx', category: Category.FIAMBRERIA },
         embutidosEnvasados: { path: '/category/656-perecedero-fiambreria-embutidos-envasadosautoservic.aspx', category: Category.FIAMBRERIA },
         pates: { path: '/category/661-perecedero-fiambreria-pates.aspx', category: Category.FIAMBRERIA },
@@ -123,7 +123,7 @@ export const stockConfig = {
         fiambresEnvasados: { path: '/category/659-perecedero-fiambreria-fiambres-envasadosautoservici.aspx', category: Category.FIAMBRERIA },
         encurtidosDespacho: { path: '/category/657-perecedero-fiambreria-encurtidos-al-despacho.aspx', category: Category.FIAMBRERIA },
 
-        // Lácteos - Quesos
+        // Dairy - Cheese
         quesoParaguayRicota: { path: '/category/945-paraguayricota.aspx', category: Category.LACTEOS },
         quesoCremosoCuartirolo: { path: '/category/946-cremososcuartirolo.aspx', category: Category.LACTEOS },
         quesoReggianitoParmesano: { path: '/category/947-regianitoparmesano.aspx', category: Category.LACTEOS },
@@ -131,7 +131,7 @@ export const stockConfig = {
         quesosSemiBlandos: { path: '/category/730-perecedero-queseria-quesos-semi-blandos-env.aspx', category: Category.LACTEOS },
         quesosUntables: { path: '/category/731-perecedero-queseria-quesos-untables-env.aspx', category: Category.LACTEOS },
 
-        // Frescos - Frutas y Verduras
+        // Fresh - Fruits and Vegetables
         citricos: { path: '/category/663-perecedero-frutas-y-verduras-citricos.aspx', category: Category.FRESCOS },
         frutasConCarozo: { path: '/category/664-perecedero-frutas-y-verduras-con-carozo-pulpa.aspx', category: Category.FRESCOS },
         frutasExoticas: { path: '/category/666-perecedero-frutas-y-verduras-exotico-tropical.aspx', category: Category.FRESCOS },
@@ -144,29 +144,29 @@ export const stockConfig = {
     },
 
     selectors: {
-        // Contenedor de productos
+        // Product container
         productContainer: '.product-item',
 
-        // Datos del producto
+        // Product data
         name: 'h2.product-title a',
         url: 'h2.product-title a',
         image: '.picture img',
 
-        // Precios - Stock usa estructura con spans
+        // Prices - Stock uses span structure
         price: '.productPrice .price-label',
 
-        // Sin stock
+        // Out of stock
         outOfStock: '.producto-sin-existencia',
 
-        // Product ID - está en la clase del contenedor (product236926)
-        productId: '', // Se extrae del class
+        // Product ID - found in container class (product236926)
+        productId: '', // Extracted from class
 
-        // Paginación - necesitamos ver el HTML de paginación
+        // Pagination
         pagination: '.pager a',
         nextPage: '.next-page a, .pager a[rel="next"]',
     },
 
-    // Parsear precio: " 11.050" -> 11050
+    // Parse price: " 11.050" -> 11050
     parsePrice: (text: string | null): number | null => {
         if (!text) return null
         const cleaned = text.replace(/[Gs\s.]/g, '')
@@ -174,14 +174,14 @@ export const stockConfig = {
         return isNaN(num) ? null : num
     },
 
-    // Extraer product ID de la clase: "product-item product236926" -> "236926"
+    // Extract product ID from class: "product-item product236926" -> "236926"
     extractProductId: (className: string | null): string | null => {
         if (!className) return null
         const match = className.match(/product(\d+)/)
         return match ? match[1] : null
     },
 
-    // Extraer número de página de URL - Stock usa ?pageindex=X
+    // Extract page number from URL - Stock uses ?pageindex=X
     extractPageNumber: (url: string): number | null => {
         const match = url.match(/pageindex=(\d+)/i)
         return match ? parseInt(match[1], 10) : null

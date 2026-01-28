@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio'
 import { stockConfig, type StockRouteKey } from '../config/stock'
 import { db } from '../../lib/db'
+import { scraperLog, logger } from '../../lib/logger'
 import type { ScrapedProduct, ScraperResult } from '../../types/index'
 
 interface StockProduct extends ScrapedProduct {
@@ -22,7 +23,7 @@ export class StockScraper {
 
         try {
             let currentUrl: string | null = `${this.config.baseUrl}${route.path}`
-            console.log(currentUrl)
+            logger.debug(`[${this.name}] URL: ${currentUrl}`)
             let pageNum = 1
 
             while (currentUrl) {
@@ -30,7 +31,7 @@ export class StockScraper {
                     const { products, nextPageUrl } = await this.scrapePage(currentUrl, route.category)
                     allProducts.push(...products)
 
-                    console.log(`[${this.name}] ${route.category} - Página ${pageNum} - ${products.length} productos`)
+                    scraperLog.page(this.name, route.category, pageNum, products.length)
 
                     currentUrl = nextPageUrl
                     pageNum++
@@ -39,19 +40,19 @@ export class StockScraper {
                         await this.delay(400)
                     }
                 } catch (error) {
-                    const msg = `Error en ${route.category} página ${pageNum}: ${error instanceof Error ? error.message : 'Unknown'}`
+                    const msg = `Error in ${route.category} page ${pageNum}: ${error instanceof Error ? error.message : 'Unknown'}`
                     errors.push(msg)
-                    console.error(`[${this.name}] ${msg}`)
+                    scraperLog.error(this.name, msg)
                     break
                 }
             }
 
-            console.log(`[${this.name}] ${route.category} - Total: ${allProducts.length} productos en ${pageNum - 1} páginas`)
+            logger.success(`[${this.name}] ${route.category} - Total: ${allProducts.length} products in ${pageNum - 1} pages`)
 
         } catch (error) {
-            const msg = `Error en ${route.category}: ${error instanceof Error ? error.message : 'Error desconocido'}`
+            const msg = `Error in ${route.category}: ${error instanceof Error ? error.message : 'Unknown error'}`
             errors.push(msg)
-            console.error(`[${this.name}] ${msg}`)
+            scraperLog.error(this.name, msg)
         }
 
         return {
@@ -73,18 +74,40 @@ export class StockScraper {
         const routeKeys = options?.onlyCategories ||
             (Object.keys(this.config.routes) as StockRouteKey[])
 
-        console.log(`\n${'='.repeat(60)}`)
-        console.log(`[${this.name}] Iniciando scrape de ${routeKeys.length} rutas`)
-        console.log(`${'='.repeat(60)}\n`)
+        const BATCH_SIZE = 3
+        const BATCH_DELAY_MS = 500
 
-        for (const routeKey of routeKeys) {
-            const result = await this.scrapeRoute(routeKey)
-            allProducts.push(...result.data)
-            allErrors.push(...result.errors)
+        scraperLog.start(this.name, routeKeys.length)
+        logger.info(`[${this.name}] Mode: ${BATCH_SIZE} in parallel, ${BATCH_DELAY_MS}ms between batches`)
 
-            console.log(`[${this.name}] ✓ ${routeKey}: ${result.data.length} productos\n`)
+        // Process in batches of 3
+        for (let i = 0; i < routeKeys.length; i += BATCH_SIZE) {
+            const batch = routeKeys.slice(i, i + BATCH_SIZE)
+            const batchNum = Math.floor(i / BATCH_SIZE) + 1
+            const totalBatches = Math.ceil(routeKeys.length / BATCH_SIZE)
 
-            await this.delay(1000)
+            scraperLog.batch(this.name, batchNum, totalBatches, batch)
+
+            // Execute batch in parallel
+            const results = await Promise.all(
+                batch.map(routeKey => this.scrapeRoute(routeKey))
+            )
+
+            // Add results
+            for (let j = 0; j < results.length; j++) {
+                const result = results[j]
+                const routeKey = batch[j]
+                allProducts.push(...result.data)
+                allErrors.push(...result.errors)
+                scraperLog.route(this.name, routeKey, result.data.length)
+            }
+
+
+
+            // Delay between batches (except the last one)
+            if (i + BATCH_SIZE < routeKeys.length) {
+                await this.delay(BATCH_DELAY_MS)
+            }
         }
 
         return {
@@ -121,25 +144,25 @@ export class StockScraper {
         $(selectors.productContainer).each((_, element) => {
             const $el = $(element)
 
-            // Verificar si está sin stock
+            // Check if out of stock
             const isOutOfStock = $el.find(selectors.outOfStock).length > 0
 
-            // Extraer nombre
+            // Extract name
             const nameEl = $el.find(selectors.name)
             const name = nameEl.text().trim()
 
-            // Extraer URL
+            // Extract URL
             const productUrl = nameEl.attr('href')
             const fullUrl = productUrl || sourceUrl
 
-            // Extraer imagen
+            // Extract image
             const imageUrl = $el.find(selectors.image).attr('src')
 
-            // Extraer product ID de la clase
+            // Extract product ID from class
             const className = $el.attr('class')
             const productId = extractProductId(className || '')
 
-            // Extraer precio
+            // Extract price
             const priceText = $el.find(selectors.price).text()
             const price = parsePrice(priceText)
 
@@ -158,13 +181,13 @@ export class StockScraper {
             products.push(product)
         })
 
-        // Buscar link a siguiente página - Stock usa .product-pager
+        // Find next page link - Stock uses .product-pager
         let nextPageUrl: string | null = null
 
-        // Buscar en la paginación de Stock
+        // Search in Stock pagination
         const pagerLinks = $('.product-pager a')
 
-        // Opción 1: Buscar link "Siguiente"
+        // Option 1: Find "Next" link
         pagerLinks.each((_, el) => {
             const $link = $(el)
             const text = $link.text().trim().toLowerCase()
@@ -175,7 +198,7 @@ export class StockScraper {
             }
         })
 
-        // Opción 2: Si no hay "Siguiente", buscar la página actual + 1
+        // Option 2: If no "Next", find current page + 1
         if (!nextPageUrl) {
             const currentPage = this.config.extractPageNumber(sourceUrl) || 1
             pagerLinks.each((_, el) => {
@@ -253,7 +276,7 @@ export class StockScraper {
                     saved++
                 }
 
-                // Solo guardar precio si está en stock
+                // Only save price if in stock
                 if (product.inStock) {
                     await db.price.create({
                         data: {
@@ -266,7 +289,7 @@ export class StockScraper {
                 }
 
             } catch (error) {
-                console.error(`Error guardando "${product.name}":`, error)
+                logger.error(`Error saving "${product.name}":`, error)
             }
         }
 
@@ -297,9 +320,12 @@ if (isMainModule) {
     const saveToDb = args.includes('--save')
     const specificRoute = args.find(a => a.startsWith('--route='))?.split('=')[1] as StockRouteKey | undefined
 
-    console.log(`\n🛒 Stock Scraper`)
-    console.log(`   Modo: ${specificRoute ? `Ruta: ${specificRoute}` : 'Todas las categorías'}`)
-    console.log(`   Guardar: ${saveToDb ? 'Sí' : 'No (usar --save para guardar)'}\n`)
+    logger.box([
+        `🛒 Stock Scraper`,
+        ``,
+        `   Mode: ${specificRoute ? `Route: ${specificRoute}` : 'All categories'}`,
+        `   Save: ${saveToDb ? 'Yes' : 'No (use --save to save)'}`,
+    ].join('\n'))
 
     let result: ScraperResult<StockProduct>
 
@@ -309,39 +335,35 @@ if (isMainModule) {
         result = await scraper.scrapeAll()
     }
 
-    console.log(`\n${'='.repeat(60)}`)
-    console.log(`RESULTADO FINAL`)
-    console.log(`${'='.repeat(60)}`)
-    console.log(`- Éxito: ${result.success}`)
-    console.log(`- Productos totales: ${result.data.length}`)
-    console.log(`- En stock: ${result.data.filter(p => p.inStock).length}`)
-    console.log(`- Sin stock: ${result.data.filter(p => !p.inStock).length}`)
-    console.log(`- Errores: ${result.errors.length}`)
-    console.log(`- Duración: ${(result.duration / 1000 / 60).toFixed(1)} minutos`)
+    // Final summary
+    scraperLog.summary(scraper.name, {
+        total: result.data.length,
+        inStock: result.data.filter(p => p.inStock).length,
+        outOfStock: result.data.filter(p => !p.inStock).length,
+        errors: result.errors.length,
+        duration: result.duration,
+    })
 
     if (result.data.length > 0) {
-        console.log(`\nEjemplos:`)
+        logger.info('Examples:')
         result.data.slice(0, 3).forEach(p => {
             const stock = p.inStock ? '✓' : '✗'
-            console.log(`  ${stock} ${p.name}: ₲ ${p.price.toLocaleString()}`)
+            logger.log(`  ${stock} ${p.name}: ₲ ${p.price.toLocaleString()}`)
         })
     }
 
-    // Resumen por categoría
+    // Summary by category
     const byCategory = result.data.reduce((acc, p) => {
         acc[p.category] = (acc[p.category] || 0) + 1
         return acc
     }, {} as Record<string, number>)
 
-    console.log(`\nProductos por categoría:`)
-    Object.entries(byCategory)
-        .sort((a, b) => b[1] - a[1])
-        .forEach(([cat, count]) => console.log(`  - ${cat}: ${count}`))
+    scraperLog.categories(scraper.name, byCategory)
 
     if (saveToDb && result.data.length > 0) {
-        console.log(`\n💾 Guardando en base de datos...`)
+        logger.start('Guardando en base de datos...')
         const { saved, updated } = await scraper.saveProducts(result.data)
-        console.log(`✓ Nuevos: ${saved} | Actualizados: ${updated}`)
+        scraperLog.saved(scraper.name, saved, updated)
     }
 
     await db.$disconnect()

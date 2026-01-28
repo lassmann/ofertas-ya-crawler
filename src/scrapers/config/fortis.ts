@@ -5,7 +5,7 @@ export const fortisConfig = {
     slug: 'fortis',
     baseUrl: 'https://www.fortis.com.py',
 
-    // Cookie de localidad (Asunción = subsidiary_id 1)
+    // Location cookie (Asunción = subsidiary_id 1)
     cookies: {
         subsidiaryId: 'fortis_subsidiary_id=eyJfcmFpbHMiOnsibWVzc2FnZSI6Ik1RPT0iLCJleHAiOm51bGwsInB1ciI6ImNvb2tpZS5mb3J0aXNfc3Vic2lkaWFyeV9pZCJ9fQ%3D%3D--69f0d671913e37393fd4c2512bc405b395990885',
     },
@@ -47,29 +47,29 @@ export const fortisConfig = {
         nextPage: 'a.page-link[rel="next"]',
     },
 
-    // Parsear precio en guaraníes: "₲ 13.900" o "Unitario ₲ 71.950" -> 71950
+    // Parse price in guaraníes: "₲ 13.900" or "Unitario ₲ 71.950" -> 71950
     parsePrice: (text: string | null): number | null => {
         if (!text) return null
-        // Remover texto como "Unitario" y solo dejar números
+        // Remove text like "Unitario" and keep only numbers
         const cleaned = text.replace(/[₲\s.a-zA-Z]/g, '')
         const num = parseInt(cleaned, 10)
         return isNaN(num) ? null : num
     },
 
-    // Parsear descuento: "- 35%" -> 35
+    // Parse discount: "- 35%" -> 35
     parseDiscount: (text: string | null): number | null => {
         if (!text) return null
         const match = text.match(/(\d+)/)
         return match ? parseInt(match[1], 10) : null
     },
 
-    // Extraer número de página de URL
+    // Extract page number from URL
     extractPageNumber: (url: string): number | null => {
         const match = url.match(/page=(\d+)/)
         return match ? parseInt(match[1], 10) : null
     },
 
-    // Parsear cantidad mínima para mayorista: "3" -> 3
+    // Parse minimum quantity for wholesale: "3" -> 3
     parseCantidadMayorista: (text: string | null): number | null => {
         if (!text) return null
         const num = parseInt(text.trim(), 10)

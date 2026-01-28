@@ -1,9 +1,9 @@
 /**
- * Categorías estandarizadas para todos los supermercados.
- * Usar estas categorías permite comparar productos entre diferentes supermercados.
+ * Standardized categories for all supermarkets.
+ * Using these categories allows comparing products across different supermarkets.
  */
 export enum Category {
-    // Alimentos básicos
+    // Basic foods
     ALMACEN = 'almacen',
     LACTEOS = 'lacteos',
     CARNES = 'carnes',
@@ -17,25 +17,25 @@ export enum Category {
     GOLOSINAS = 'golosinas',
     SALUDABLES = 'saludables',
 
-    // Bebidas
+    // Beverages
     BEBIDAS_CON_ALCOHOL = 'bebidas-con-alcohol',
     BEBIDAS_SIN_ALCOHOL = 'bebidas-sin-alcohol',
 
-    // Hogar y limpieza
+    // Home and cleaning
     HOGAR_Y_BAZAR = 'hogar-y-bazar',
     LIMPIEZA = 'limpieza',
     FERRETERIA = 'ferreteria',
 
-    // Cuidado personal y salud
+    // Personal care and health
     PERFUMERIA = 'perfumeria',
     BEBES = 'bebes',
     MASCOTAS = 'mascotas',
 
-    // Otros
+    // Others
     ELECTRODOMESTICOS = 'electrodomesticos',
     JUGUETES_Y_LIBRERIA = 'juguetes-y-libreria',
 
-    // Ofertas especiales
+    // Special offers
     OFERTAS = 'ofertas',
 }
 

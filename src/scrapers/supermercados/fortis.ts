@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio'
 import { fortisConfig, type FortisRouteKey } from '../config/fortis'
 import { db } from '../../lib/db.js'
+import { scraperLog, logger } from '../../lib/logger'
 import type { ScrapedProduct, ScraperResult } from '../../types/index'
 
 interface FortisProduct extends ScrapedProduct {
@@ -15,7 +16,7 @@ export class FortisScraper {
     get name() { return this.config.name }
     get slug() { return this.config.slug }
 
-    // Scrapear una ruta específica - NUEVA LÓGICA
+    // Scrape a specific route
     async scrapeRoute(routeKey: FortisRouteKey): Promise<ScraperResult<FortisProduct>> {
         const startTime = Date.now()
         const allProducts: FortisProduct[] = []
@@ -31,7 +32,7 @@ export class FortisScraper {
                     const { products, nextPageUrl } = await this.scrapePage(currentUrl, route.category)
                     allProducts.push(...products)
 
-                    console.log(`[${this.name}] ${route.category} - Página ${pageNum} - ${products.length} productos`)
+                    scraperLog.page(this.name, route.category, pageNum, products.length)
 
                     currentUrl = nextPageUrl
                     pageNum++
@@ -40,19 +41,19 @@ export class FortisScraper {
                         await this.delay(300)
                     }
                 } catch (error) {
-                    const msg = `Error en ${route.category} página ${pageNum}: ${error instanceof Error ? error.message : 'Unknown'}`
+                    const msg = `Error in ${route.category} page ${pageNum}: ${error instanceof Error ? error.message : 'Unknown'}`
                     errors.push(msg)
-                    console.error(`[${this.name}] ${msg}`)
-                    break // Salir del loop si hay error
+                    scraperLog.error(this.name, msg)
+                    break // Exit loop on error
                 }
             }
 
-            console.log(`[${this.name}] ${route.category} - Total: ${allProducts.length} productos en ${pageNum - 1} páginas`)
+            logger.success(`[${this.name}] ${route.category} - Total: ${allProducts.length} products in ${pageNum - 1} pages`)
 
         } catch (error) {
-            const msg = `Error en ${route.category}: ${error instanceof Error ? error.message : 'Error desconocido'}`
+            const msg = `Error in ${route.category}: ${error instanceof Error ? error.message : 'Unknown error'}`
             errors.push(msg)
-            console.error(`[${this.name}] ${msg}`)
+            scraperLog.error(this.name, msg)
         }
 
         return {
@@ -64,7 +65,7 @@ export class FortisScraper {
         }
     }
 
-    // Scrapear todas las rutas
+    // Scrape all routes - BATCH MODE
     async scrapeAll(options?: {
         onlyCategories?: FortisRouteKey[]
     }): Promise<ScraperResult<FortisProduct>> {
@@ -75,19 +76,38 @@ export class FortisScraper {
         const routeKeys = options?.onlyCategories ||
             (Object.keys(this.config.routes) as FortisRouteKey[])
 
-        console.log(`\n${'='.repeat(60)}`)
-        console.log(`[${this.name}] Iniciando scrape de ${routeKeys.length} rutas`)
-        console.log(`${'='.repeat(60)}\n`)
+        const BATCH_SIZE = 3
+        const BATCH_DELAY_MS = 500
 
-        for (const routeKey of routeKeys) {
-            const result = await this.scrapeRoute(routeKey)
-            allProducts.push(...result.data)
-            allErrors.push(...result.errors)
+        scraperLog.start(this.name, routeKeys.length)
+        logger.info(`[${this.name}] Mode: ${BATCH_SIZE} in parallel, ${BATCH_DELAY_MS}ms between batches`)
 
-            console.log(`[${this.name}] ✓ ${routeKey}: ${result.data.length} productos\n`)
+        // Process in batches of 3
+        for (let i = 0; i < routeKeys.length; i += BATCH_SIZE) {
+            const batch = routeKeys.slice(i, i + BATCH_SIZE)
+            const batchNum = Math.floor(i / BATCH_SIZE) + 1
+            const totalBatches = Math.ceil(routeKeys.length / BATCH_SIZE)
 
-            // Pausa entre categorías
-            await this.delay(1000)
+            scraperLog.batch(this.name, batchNum, totalBatches, batch)
+
+            // Execute batch in parallel
+            const results = await Promise.all(
+                batch.map(routeKey => this.scrapeRoute(routeKey))
+            )
+
+            // Add results
+            for (let j = 0; j < results.length; j++) {
+                const result = results[j]
+                const routeKey = batch[j]
+                allProducts.push(...result.data)
+                allErrors.push(...result.errors)
+                scraperLog.route(this.name, routeKey, result.data.length)
+            }
+
+            // Delay between batches (except the last one)
+            if (i + BATCH_SIZE < routeKeys.length) {
+                await this.delay(BATCH_DELAY_MS)
+            }
         }
 
         return {
@@ -99,7 +119,7 @@ export class FortisScraper {
         }
     }
 
-    // Cambiar el return type de scrapePage
+    // Scrape a single page
     async scrapePage(url: string, category: string): Promise<{ products: FortisProduct[]; nextPageUrl: string | null }> {
         const response = await fetch(url, {
             headers: {
@@ -118,7 +138,7 @@ export class FortisScraper {
         return this.parseHtml(html, url, category)
     }
 
-    // Actualizar parseHtml para retornar nextPageUrl
+    // Parse HTML and return products with next page URL
     parseHtml(html: string, sourceUrl: string, category: string): { products: FortisProduct[]; nextPageUrl: string | null } {
         const $ = cheerio.load(html)
         const products: FortisProduct[] = []
@@ -164,10 +184,10 @@ export class FortisScraper {
             products.push(product)
         })
 
-        // Buscar link "siguiente" (rel="next" o el botón ›)
+        // Find "next" link (rel="next" or › button)
         let nextPageUrl: string | null = null
 
-        // Opción 1: Buscar por rel="next"
+        // Option 1: Search by rel="next"
         const nextLink = $('a[rel="next"]').first()
         if (nextLink.length > 0) {
             const href = nextLink.attr('href')
@@ -177,7 +197,7 @@ export class FortisScraper {
             }
         }
 
-        // Opción 2: Si no encontramos rel="next", buscar el botón › que tiene bg-cat
+        // Option 2: If rel="next" not found, look for › button with bg-cat
         if (!nextPageUrl) {
             const nextButton = $('a.page-link.bg-cat[rel="next"]')
             if (nextButton.length > 0) {
@@ -252,11 +272,11 @@ export class FortisScraper {
                     saved++
                 }
 
-                // Crear registro de precio
+                // Create price record
                 await db.price.create({
                     data: {
                         price: product.price,
-                        oldPrice: product.precioMayorista, // Guardamos mayorista como referencia
+                        oldPrice: product.precioMayorista, // Store wholesale price as reference
                         sourceUrl: product.sourceUrl,
                         productId: dbProduct.id,
                         storeId: store.id,
@@ -264,7 +284,7 @@ export class FortisScraper {
                 })
 
             } catch (error) {
-                console.error(`Error guardando "${product.name}":`, error)
+                logger.error(`Error saving "${product.name}":`, error)
             }
         }
 
@@ -295,9 +315,12 @@ if (isMainModule) {
     const saveToDb = args.includes('--save')
     const specificRoute = args.find(a => a.startsWith('--route='))?.split('=')[1] as FortisRouteKey | undefined
 
-    console.log(`\n🛒 Fortis Scraper`)
-    console.log(`   Modo: ${specificRoute ? `Ruta: ${specificRoute}` : 'Todas las categorías'}`)
-    console.log(`   Guardar: ${saveToDb ? 'Sí' : 'No (usar --save para guardar)'}\n`)
+    logger.box([
+        `🛒 Fortis Scraper`,
+        ``,
+        `   Mode: ${specificRoute ? `Route: ${specificRoute}` : 'All categories'}`,
+        `   Save: ${saveToDb ? 'Yes' : 'No (use --save to save)'}`,
+    ].join('\n'))
 
     let result: ScraperResult<FortisProduct>
 
@@ -307,42 +330,37 @@ if (isMainModule) {
         result = await scraper.scrapeAll()
     }
 
-    console.log(`\n${'='.repeat(60)}`)
-    console.log(`RESULTADO FINAL`)
-    console.log(`${'='.repeat(60)}`)
-    console.log(`- Éxito: ${result.success}`)
-    console.log(`- Productos totales: ${result.data.length}`)
-    console.log(`- Productos únicos: ${new Set(result.data.map(p => p.name)).size}`)
-    console.log(`- Errores: ${result.errors.length}`)
-    console.log(`- Duración: ${(result.duration / 1000 / 60).toFixed(1)} minutos`)
+    // Final summary
+    scraperLog.summary(scraper.name, {
+        total: result.data.length,
+        errors: result.errors.length,
+        duration: result.duration,
+    })
 
-    // Mostrar algunos productos de ejemplo
+    // Show sample products
     if (result.data.length > 0) {
-        console.log(`\nEjemplos de productos:`)
+        logger.info('Sample products:')
         result.data.slice(0, 3).forEach(p => {
-            console.log(`  - ${p.name}`)
-            console.log(`    Precio unitario: ₲ ${p.price.toLocaleString()}`)
+            logger.log(`  - ${p.name}`)
+            logger.log(`    Unit price: ₲ ${p.price.toLocaleString()}`)
             if (p.precioMayorista) {
-                console.log(`    Precio mayorista: ₲ ${p.precioMayorista.toLocaleString()} (a partir de ${p.cantidadMayorista} unidades)`)
+                logger.log(`    Wholesale price: ₲ ${p.precioMayorista.toLocaleString()} (from ${p.cantidadMayorista} units)`)
             }
         })
     }
 
-    // Resumen por categoría
+    // Summary by category
     const byCategory = result.data.reduce((acc, p) => {
         acc[p.category] = (acc[p.category] || 0) + 1
         return acc
     }, {} as Record<string, number>)
 
-    console.log(`\nProductos por categoría:`)
-    Object.entries(byCategory)
-        .sort((a, b) => b[1] - a[1])
-        .forEach(([cat, count]) => console.log(`  - ${cat}: ${count}`))
+    scraperLog.categories(scraper.name, byCategory)
 
     if (saveToDb && result.data.length > 0) {
-        console.log(`\n💾 Guardando en base de datos...`)
+        logger.start('Guardando en base de datos...')
         const { saved, updated } = await scraper.saveProducts(result.data)
-        console.log(`✓ Nuevos: ${saved} | Actualizados: ${updated}`)
+        scraperLog.saved(scraper.name, saved, updated)
     }
 
     await db.$disconnect()

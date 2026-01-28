@@ -1,30 +1,34 @@
 import { db } from '../lib/db'
+import { logger } from '../lib/logger'
 
 async function main() {
   const products = await db.product.count()
   const prices = await db.price.count()
   const stores = await db.store.count()
 
-  console.log('\n📊 Estadísticas de la base de datos:\n')
-  console.log(`  Tiendas:   ${stores}`)
-  console.log(`  Productos: ${products}`)
-  console.log(`  Precios:   ${prices}`)
+  logger.box([
+    '📊 Database Statistics',
+    '',
+    `   Stores:    ${stores}`,
+    `   Products:  ${products}`,
+    `   Prices:    ${prices}`,
+  ].join('\n'))
 
-  // Productos por tienda
+  // Products by store
   const byStore = await db.product.groupBy({
     by: ['storeId'],
     _count: true,
   })
 
   if (byStore.length > 0) {
-    console.log('\n📦 Productos por tienda:')
+    logger.info('📦 Products by store:')
     for (const group of byStore) {
       const store = await db.store.findUnique({ where: { id: group.storeId } })
-      console.log(`  - ${store?.name}: ${group._count}`)
+      logger.log(`  - ${store?.name}: ${group._count}`)
     }
   }
 
-  // Productos por categoría (top 10)
+  // Products by category (top 10)
   const byCategory = await db.product.groupBy({
     by: ['category'],
     _count: true,
@@ -33,14 +37,13 @@ async function main() {
   })
 
   if (byCategory.length > 0) {
-    console.log('\n🏷️  Top 10 categorías:')
+    logger.info('🏷️  Top 10 categories:')
     byCategory.forEach(c => {
-      console.log(`  - ${c.category || 'sin categoría'}: ${c._count}`)
+      logger.log(`  - ${c.category || 'no category'}: ${c._count}`)
     })
   }
 
-  console.log('')
   await db.$disconnect()
 }
 
-main().catch(console.error)
+main().catch(logger.error)
