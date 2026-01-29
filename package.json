@@ -13,6 +13,8 @@
     "scrape:fortis:save": "tsx src/scrapers/supermercados/fortis.ts --save",
     "scrape:stock": "tsx src/scrapers/supermercados/stock.ts",
     "scrape:stock:save": "tsx src/scrapers/supermercados/stock.ts --save",
+    "scrape:casarica": "tsx src/scrapers/supermercados/casarica.ts",
+    "scrape:casarica:save": "tsx src/scrapers/supermercados/casarica.ts --save",
     "test": "vitest",
     "test:run": "vitest run",
     "db:push": "prisma db push",

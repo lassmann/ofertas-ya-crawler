@@ -43,7 +43,8 @@ model Product {
   subcategory    String?
   unit           String?
   quantity       Float?
-  barcode        String?  @unique
+  barcode        String?  // EAN/UPC - not unique, same product can be in multiple stores
+  externalId     String?  // Store's internal product ID (e.g., "12173" from Casa Rica)
   imageUrl       String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -53,8 +54,10 @@ model Product {
   prices  Price[]
 
   @@unique([storeId, normalizedName])
+  @@unique([storeId, externalId])
   @@index([normalizedName])
   @@index([storeId])
+  @@index([barcode])
 }
 
 model Price {

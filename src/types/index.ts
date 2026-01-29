@@ -10,6 +10,8 @@ export interface ScrapedProduct {
   unit?: string
   quantity?: number
   productId?: string
+  externalId?: string  // Store's internal product ID
+  barcode?: string     // EAN/UPC barcode
 }
 
 export interface ScrapedPromotion {
