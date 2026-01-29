@@ -142,7 +142,7 @@ export class FortisScraper {
     parseHtml(html: string, sourceUrl: string, category: string): { products: FortisProduct[]; nextPageUrl: string | null } {
         const $ = cheerio.load(html)
         const products: FortisProduct[] = []
-        const { selectors, parsePrice, parseCantidadMayorista } = this.config
+        const { selectors, parsePrice, parseCantidadMayorista, extractBarcode } = this.config
 
         $(selectors.productContainer).each((_, element) => {
             const $el = $(element)
@@ -154,7 +154,8 @@ export class FortisScraper {
             const fullUrl = productUrl ? `${this.config.baseUrl}${productUrl}` : sourceUrl
 
             const imageUrl = $el.find(selectors.image).attr('src')
-            const productId = $el.attr('data-product-id')
+            const externalId = $el.attr('data-product-id')
+            const barcode = extractBarcode(productUrl)
 
             const precioMayoristaText = $el.find(selectors.priceMayorista).first().text()
             const precioUnitarioText = $el.find(selectors.priceUnitario).text()
@@ -177,7 +178,8 @@ export class FortisScraper {
                 cantidadMayorista: cantidadMayorista || undefined,
                 imageUrl,
                 sourceUrl: fullUrl,
-                productId,
+                externalId,
+                barcode,
                 category,
             }
 
@@ -255,6 +257,8 @@ export class FortisScraper {
                         name: product.name,
                         imageUrl: product.imageUrl,
                         category: product.category,
+                        externalId: product.externalId,
+                        barcode: product.barcode,
                         updatedAt: new Date(),
                     },
                     create: {
@@ -262,6 +266,8 @@ export class FortisScraper {
                         normalizedName,
                         imageUrl: product.imageUrl,
                         category: product.category,
+                        externalId: product.externalId,
+                        barcode: product.barcode,
                         storeId: store.id,
                     },
                 })

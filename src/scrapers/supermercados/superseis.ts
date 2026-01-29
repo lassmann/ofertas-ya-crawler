@@ -166,7 +166,7 @@ export class SuperseisScraper {
         imageUrl: $el.find(selectors.image).attr('src') || undefined,
         sourceUrl: $el.find(selectors.url).attr('href') || sourceUrl,
         unit: $el.find(selectors.saleType).text().trim() || undefined,
-        productId: $el.find(selectors.productId).attr('data-product-id') || undefined,
+        externalId: $el.find(selectors.productId).attr('data-product-id') || undefined,
         category,
       }
 
@@ -227,6 +227,7 @@ export class SuperseisScraper {
             name: product.name,
             imageUrl: product.imageUrl,
             category: product.category,
+            externalId: product.externalId,
             updatedAt: new Date(),
           },
           create: {
@@ -234,6 +235,7 @@ export class SuperseisScraper {
             normalizedName,
             imageUrl: product.imageUrl,
             category: product.category,
+            externalId: product.externalId,
             storeId: store.id,
           },
         })

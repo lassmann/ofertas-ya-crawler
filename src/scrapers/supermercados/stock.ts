@@ -160,7 +160,7 @@ export class StockScraper {
 
             // Extract product ID from class
             const className = $el.attr('class')
-            const productId = extractProductId(className || '')
+            const externalId = extractProductId(className || '') || undefined
 
             // Extract price
             const priceText = $el.find(selectors.price).text()
@@ -173,7 +173,7 @@ export class StockScraper {
                 price,
                 imageUrl: imageUrl || undefined,
                 sourceUrl: fullUrl,
-                productId: productId || undefined,
+                externalId,
                 category,
                 inStock: !isOutOfStock,
             }
@@ -259,6 +259,7 @@ export class StockScraper {
                         name: product.name,
                         imageUrl: product.imageUrl,
                         category: product.category,
+                        externalId: product.externalId,
                         updatedAt: new Date(),
                     },
                     create: {
@@ -266,6 +267,7 @@ export class StockScraper {
                         normalizedName,
                         imageUrl: product.imageUrl,
                         category: product.category,
+                        externalId: product.externalId,
                         storeId: store.id,
                     },
                 })

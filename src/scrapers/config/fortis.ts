@@ -75,6 +75,13 @@ export const fortisConfig = {
         const num = parseInt(text.trim(), 10)
         return isNaN(num) ? null : num
     },
+
+    // Extract barcode from URL: "/producto/crema-de-leche-7896434920723" -> "7896434920723"
+    extractBarcode: (url: string | undefined): string | undefined => {
+        if (!url) return undefined
+        const match = url.match(/-(\d{8,14})(?:$|\?)/)
+        return match ? match[1] : undefined
+    },
 }
 
 export type FortisConfig = typeof fortisConfig
