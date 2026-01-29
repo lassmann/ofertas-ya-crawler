@@ -15,6 +15,8 @@
     "scrape:stock:save": "tsx src/scrapers/supermercados/stock.ts --save",
     "scrape:casarica": "tsx src/scrapers/supermercados/casarica.ts",
     "scrape:casarica:save": "tsx src/scrapers/supermercados/casarica.ts --save",
+    "scrape:biggie": "tsx src/scrapers/supermercados/biggie.ts",
+    "scrape:biggie:save": "tsx src/scrapers/supermercados/biggie.ts --save",
     "test": "vitest",
     "test:run": "vitest run",
     "db:push": "prisma db push",

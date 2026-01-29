@@ -5,6 +5,7 @@ import { SuperseisScraper } from '../scrapers/supermercados/superseis.js'
 import { CasaRicaScraper } from '../scrapers/supermercados/casarica.js'
 import { FortisScraper } from '../scrapers/supermercados/fortis.js'
 import { StockScraper } from '../scrapers/supermercados/stock.js'
+import { BiggieScraper } from '../scrapers/supermercados/biggie.js'
 import type { ScrapedProduct, ScraperResult } from '../types/index.js'
 
 interface Scraper<T extends ScrapedProduct> {
@@ -46,6 +47,7 @@ async function main() {
   await runScraper(new CasaRicaScraper())
   await runScraper(new FortisScraper())
   await runScraper(new StockScraper())
+  await runScraper(new BiggieScraper())
 
   logger.box([
     '✅ Crawler Finished',
