@@ -52,6 +52,7 @@ model Product {
   store   Store  @relation(fields: [storeId], references: [id])
   storeId String
   prices  Price[]
+  match   ProductMatch?
 
   @@unique([storeId, normalizedName])
   @@unique([storeId, externalId])
@@ -138,6 +139,68 @@ enum DiscountType {
   CUOTAS_SIN_INTERES
   CASHBACK
   OTRO
+}
+
+// === MATCHING SYSTEM ===
+
+// Producto canónico - representa UN producto real único
+model CanonicalProduct {
+  id             String  @id @default(uuid())
+  name           String // Nombre legible: "Coca-Cola Original 2L"
+  normalizedName String  @unique
+  brand          String?
+  category       String?
+  quantity       Float? // 2000
+  unit           String? // "ml"
+  primaryBarcode String? @unique // EAN/UPC principal
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  matches ProductMatch[]
+  aliases CanonicalAlias[]
+
+  @@index([normalizedName])
+}
+
+// Alias de nombres conocidos que mapean a un producto canónico
+model CanonicalAlias {
+  id             String @id @default(uuid())
+  normalizedName String @unique // El nombre normalizado de una tienda específica
+
+  canonicalProduct   CanonicalProduct @relation(fields: [canonicalProductId], references: [id])
+  canonicalProductId String
+
+  createdAt DateTime @default(now())
+
+  @@index([canonicalProductId])
+}
+
+// Match entre un Product (de tienda) y un CanonicalProduct
+model ProductMatch {
+  id         String    @id @default(uuid())
+  matchType  MatchType
+  confidence Float // 0.0 - 1.0
+  isVerified Boolean   @default(false)
+
+  product   Product @relation(fields: [productId], references: [id])
+  productId String  @unique
+
+  canonicalProduct   CanonicalProduct @relation(fields: [canonicalProductId], references: [id])
+  canonicalProductId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([canonicalProductId])
+  @@index([matchType])
+}
+
+enum MatchType {
+  BARCODE // 100% confianza - match por EAN/UPC
+  ALIAS   // 99% confianza - lookup en tabla de alias
+  FUZZY   // 60-95% confianza - pg_trgm similarity
+  MANUAL  // 100% confianza - verificado manualmente
 }
 
 model PromotionDuplicate {

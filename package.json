@@ -17,6 +17,10 @@
     "scrape:casarica:save": "tsx src/scrapers/supermercados/casarica.ts --save",
     "scrape:biggie": "tsx src/scrapers/supermercados/biggie.ts",
     "scrape:biggie:save": "tsx src/scrapers/supermercados/biggie.ts --save",
+    "scrape:salemma": "tsx src/scrapers/supermercados/salemma.ts",
+    "scrape:salemma:ofertas": "tsx src/scrapers/supermercados/salemma.ts --ofertas",
+    "scrape:salemma:save": "tsx src/scrapers/supermercados/salemma.ts --save",
+    "scrape:salemma:ofertas:save": "tsx src/scrapers/supermercados/salemma.ts --ofertas --save",
     "test": "vitest",
     "test:run": "vitest run",
     "db:push": "prisma db push",
@@ -27,7 +31,11 @@
     "stats": "tsx src/scripts/stats.ts",
     "compare": "tsx src/scripts/compare-prices.ts",
     "compare:lacteos": "tsx src/scripts/compare-prices.ts --category=lacteos",
-    "compare:bebidas": "tsx src/scripts/compare-prices.ts --category=bebidas"
+    "compare:bebidas": "tsx src/scripts/compare-prices.ts --category=bebidas",
+    "test:matching": "tsx src/scripts/test-matching.ts",
+    "match:process": "tsx src/jobs/process-matches.ts",
+    "match:stats": "tsx src/jobs/process-matches.ts --stats",
+    "compare:v2": "tsx src/scripts/compare-v2.ts"
   },
   "devDependencies": {
     "@types/cheerio": "^0.22.35",
