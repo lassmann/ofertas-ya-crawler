@@ -35,19 +35,20 @@ enum StoreType {
 }
 
 model Product {
-  id             String   @id @default(uuid())
-  name           String
-  normalizedName String
-  brand          String?
-  category       String?
-  subcategory    String?
-  unit           String?
-  quantity       Float?
-  barcode        String?  // EAN/UPC - not unique, same product can be in multiple stores
-  externalId     String?  // Store's internal product ID (e.g., "12173" from Casa Rica)
-  imageUrl       String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  name               String
+  normalizedName     String
+  baseNormalizedName String?  // Name without quantity/unit (e.g., "coca cola original" from "coca cola original 2l")
+  brand              String?
+  category           String?
+  subcategory        String?
+  unit               String?  // Normalized unit: "ml", "l", "g", "kg", "un"
+  quantity           Float?   // Numeric quantity extracted from name
+  barcode            String?  // EAN/UPC - not unique, same product can be in multiple stores
+  externalId         String?  // Store's internal product ID (e.g., "12173" from Casa Rica)
+  imageUrl           String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   store   Store  @relation(fields: [storeId], references: [id])
   storeId String
@@ -57,6 +58,7 @@ model Product {
   @@unique([storeId, normalizedName])
   @@unique([storeId, externalId])
   @@index([normalizedName])
+  @@index([baseNormalizedName])
   @@index([storeId])
   @@index([barcode])
 }
@@ -145,14 +147,15 @@ enum DiscountType {
 
 // Producto canónico - representa UN producto real único
 model CanonicalProduct {
-  id             String  @id @default(uuid())
-  name           String // Nombre legible: "Coca-Cola Original 2L"
-  normalizedName String  @unique
-  brand          String?
-  category       String?
-  quantity       Float? // 2000
-  unit           String? // "ml"
-  primaryBarcode String? @unique // EAN/UPC principal
+  id                 String  @id @default(uuid())
+  name               String // Nombre legible: "Coca-Cola Original 2L"
+  normalizedName     String  @unique
+  baseNormalizedName String? // Name without quantity/unit for matching
+  brand              String?
+  category           String?
+  quantity           Float? // Numeric quantity (e.g., 2 for "2L")
+  unit               String? // Normalized unit: "ml", "l", "g", "kg", "un"
+  primaryBarcode     String? @unique // EAN/UPC principal
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -161,6 +164,7 @@ model CanonicalProduct {
   aliases CanonicalAlias[]
 
   @@index([normalizedName])
+  @@index([baseNormalizedName])
 }
 
 // Alias de nombres conocidos que mapean a un producto canónico

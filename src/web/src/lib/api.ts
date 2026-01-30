@@ -163,6 +163,7 @@ export const api = {
     category?: string
     search?: string
     minStores?: number
+    sort?: 'discount'
   }) => {
     const query = new URLSearchParams()
     if (params.page) query.set('page', params.page.toString())
@@ -170,6 +171,7 @@ export const api = {
     if (params.category) query.set('category', params.category)
     if (params.search) query.set('search', params.search)
     if (params.minStores) query.set('minStores', params.minStores.toString())
+    if (params.sort) query.set('sort', params.sort)
     return fetchApi<PaginatedResponse<MatchedProduct>>(`/products/matched?${query}`)
   },
 

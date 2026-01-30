@@ -1,6 +1,7 @@
 import { biggieConfig, type BiggieRouteKey } from '../config/biggie'
 import { db } from '../../lib/db'
 import { scraperLog, logger } from '../../lib/logger'
+import { parseProductName } from '../../lib/matching/fuzzy-matcher'
 import type { ScrapedProduct, ScraperResult } from '../../types/index'
 
 function slugify(text: string): string {
@@ -223,6 +224,7 @@ export class BiggieScraper {
 
         for (const product of products) {
             const normalizedName = this.normalizeName(product.name)
+            const parsed = parseProductName(normalizedName)
 
             if (seen.has(normalizedName)) continue
             seen.add(normalizedName)
@@ -246,6 +248,9 @@ export class BiggieScraper {
                     },
                     update: {
                         name: product.name,
+                        baseNormalizedName: parsed.baseName,
+                        quantity: parsed.quantity,
+                        unit: parsed.unit,
                         imageUrl: product.imageUrl,
                         category: product.category,
                         brand: product.brand,
@@ -256,6 +261,9 @@ export class BiggieScraper {
                     create: {
                         name: product.name,
                         normalizedName,
+                        baseNormalizedName: parsed.baseName,
+                        quantity: parsed.quantity,
+                        unit: parsed.unit,
                         imageUrl: product.imageUrl,
                         category: product.category,
                         brand: product.brand,

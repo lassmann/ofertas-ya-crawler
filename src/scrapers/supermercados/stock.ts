@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio'
 import { stockConfig, type StockRouteKey } from '../config/stock'
 import { db } from '../../lib/db'
 import { scraperLog, logger } from '../../lib/logger'
+import { parseProductName } from '../../lib/matching/fuzzy-matcher'
 import type { ScrapedProduct, ScraperResult } from '../../types/index'
 
 interface StockProduct extends ScrapedProduct {
@@ -234,6 +235,7 @@ export class StockScraper {
 
         for (const product of products) {
             const normalizedName = this.normalizeName(product.name)
+            const parsed = parseProductName(normalizedName)
 
             if (seen.has(normalizedName)) continue
             seen.add(normalizedName)
@@ -257,6 +259,9 @@ export class StockScraper {
                     },
                     update: {
                         name: product.name,
+                        baseNormalizedName: parsed.baseName,
+                        quantity: parsed.quantity,
+                        unit: parsed.unit,
                         imageUrl: product.imageUrl,
                         category: product.category,
                         externalId: product.externalId,
@@ -265,6 +270,9 @@ export class StockScraper {
                     create: {
                         name: product.name,
                         normalizedName,
+                        baseNormalizedName: parsed.baseName,
+                        quantity: parsed.quantity,
+                        unit: parsed.unit,
                         imageUrl: product.imageUrl,
                         category: product.category,
                         externalId: product.externalId,
@@ -278,17 +286,14 @@ export class StockScraper {
                     saved++
                 }
 
-                // Only save price if in stock
-                if (product.inStock) {
-                    await db.price.create({
-                        data: {
-                            price: product.price,
-                            sourceUrl: product.sourceUrl,
-                            productId: dbProduct.id,
-                            storeId: store.id,
-                        },
-                    })
-                }
+                await db.price.create({
+                    data: {
+                        price: product.price,
+                        sourceUrl: product.sourceUrl,
+                        productId: dbProduct.id,
+                        storeId: store.id,
+                    },
+                })
 
             } catch (error) {
                 logger.error(`Error saving "${product.name}":`, error)

@@ -1,21 +1,132 @@
+# Guia: Agregar Nuevo Scraper
+
+Esta guia explica como agregar un scraper para un nuevo supermercado.
+
+## Paso 1: Analizar el Sitio Web
+
+Antes de escribir codigo, analiza el sitio web:
+
+1. **Identificar estructura de URLs**
+   - Como estan organizadas las categorias?
+   - Como funciona la paginacion? (`?page=2`, `/page/2`, scroll infinito?)
+
+2. **Identificar selectores CSS**
+   - Container de productos
+   - Nombre del producto
+   - Precio actual y precio anterior
+   - Imagen
+   - URL del producto
+
+3. **Verificar si necesita JavaScript**
+   - Si el contenido carga con JavaScript, Cheerio no funcionara
+   - En ese caso, considera usar la API del sitio directamente
+
+## Paso 2: Crear Configuracion
+
+Crear archivo en `src/scrapers/config/{nombre}.ts`:
+
+```typescript
+// src/scrapers/config/nuevotienda.ts
+
+export type RouteKey = 'lacteos' | 'bebidas' | 'carnes' | 'ofertas'
+
+export const nuevotiendaConfig = {
+  name: 'Nueva Tienda',
+  slug: 'nuevatienda',
+  baseUrl: 'https://www.nuevatienda.com.py',
+
+  selectors: {
+    // Container de cada producto
+    productContainer: '.product-card',
+
+    // Nombre del producto
+    name: '.product-name',
+    nameAttr: undefined,  // O 'title' si el nombre esta en un atributo
+
+    // Precios
+    priceNew: '.current-price',
+    priceOld: '.original-price',
+    discountPercent: '.discount-badge',
+
+    // Imagen
+    image: '.product-image img',
+
+    // URL del producto
+    url: 'a.product-link',
+
+    // Tipo de venta (opcional)
+    saleType: '.sale-type',
+
+    // ID del producto (opcional)
+    productId: '[data-id]',
+
+    // Paginacion
+    lastPage: '.pagination a:last-child',
+  },
+
+  parsePrice: (text: string): number | null => {
+    // Adaptar segun formato del sitio
+    // "Gs. 15.000" -> 15000
+    // "₲ 15,000" -> 15000
+    const cleaned = text.replace(/[^\d]/g, '')
+    return cleaned ? parseInt(cleaned, 10) : null
+  },
+
+  parseDiscount: (text: string): number | null => {
+    const match = text.match(/(\d+)/)
+    return match ? parseInt(match[1], 10) : null
+  },
+
+  extractPageNumber: (url: string): number => {
+    // Adaptar segun URL del sitio
+    const match = url.match(/page[=/](\d+)/)
+    return match ? parseInt(match[1], 10) : 1
+  },
+
+  routes: {
+    lacteos: {
+      path: '/categoria/lacteos',
+      category: 'lacteos',
+    },
+    bebidas: {
+      path: '/categoria/bebidas',
+      category: 'bebidas',
+    },
+    carnes: {
+      path: '/categoria/carnes',
+      category: 'carnes',
+    },
+    ofertas: {
+      path: '/ofertas',
+      category: 'ofertas',
+    },
+  },
+}
+```
+
+## Paso 3: Crear Scraper
+
+Crear archivo en `src/scrapers/supermercados/{nombre}.ts`:
+
+```typescript
+// src/scrapers/supermercados/nuevatienda.ts
+
 import * as cheerio from 'cheerio'
-import { superseisConfig, type RouteKey } from '../config/superseis'
+import { nuevatiendaConfig, type RouteKey } from '../config/nuevatienda'
 import { db } from '../../lib/db.js'
 import { scraperLog, logger } from '../../lib/logger'
-import { parseProductName } from '../../lib/matching/fuzzy-matcher'
 import type { ScrapedProduct, ScraperResult } from '../../types/index'
 
 interface ScrapedProductWithCategory extends ScrapedProduct {
   category: string
 }
 
-export class SuperseisScraper {
-  private config = superseisConfig
+export class NuevaTiendaScraper {
+  private config = nuevatiendaConfig
 
   get name() { return this.config.name }
   get slug() { return this.config.slug }
 
-  // Scrape a specific route
   async scrapeRoute(routeKey: RouteKey): Promise<ScraperResult<ScrapedProductWithCategory>> {
     const startTime = Date.now()
     const allProducts: ScrapedProductWithCategory[] = []
@@ -44,9 +155,6 @@ export class SuperseisScraper {
           scraperLog.error(this.name, msg)
         }
       }
-
-      logger.success(`[${this.name}] ${route.category} - Total: ${allProducts.length} products in ${totalPages} pages`)
-
     } catch (error) {
       const msg = `Error in ${route.category}: ${error instanceof Error ? error.message : 'Unknown error'}`
       errors.push(msg)
@@ -62,52 +170,30 @@ export class SuperseisScraper {
     }
   }
 
-  // Scrape all routes - BATCH MODE
-  async scrapeAll(options?: {
-    includeOfertas?: boolean
-    onlyCategories?: RouteKey[]
-  }): Promise<ScraperResult<ScrapedProductWithCategory>> {
+  async scrapeAll(): Promise<ScraperResult<ScrapedProductWithCategory>> {
     const startTime = Date.now()
     const allProducts: ScrapedProductWithCategory[] = []
     const allErrors: string[] = []
 
-    const routeKeys = options?.onlyCategories ||
-      (Object.keys(this.config.routes) as RouteKey[])
-
-    const routesToScrape = options?.includeOfertas === false
-      ? routeKeys.filter(k => k !== 'ofertas')
-      : routeKeys
-
+    const routeKeys = Object.keys(this.config.routes) as RouteKey[]
     const BATCH_SIZE = 3
     const BATCH_DELAY_MS = 500
 
-    scraperLog.start(this.name, routesToScrape.length)
-    logger.info(`[${this.name}] Mode: ${BATCH_SIZE} in parallel, ${BATCH_DELAY_MS}ms between batches`)
+    scraperLog.start(this.name, routeKeys.length)
 
-    // Process in batches of 3
-    for (let i = 0; i < routesToScrape.length; i += BATCH_SIZE) {
-      const batch = routesToScrape.slice(i, i + BATCH_SIZE)
-      const batchNum = Math.floor(i / BATCH_SIZE) + 1
-      const totalBatches = Math.ceil(routesToScrape.length / BATCH_SIZE)
+    for (let i = 0; i < routeKeys.length; i += BATCH_SIZE) {
+      const batch = routeKeys.slice(i, i + BATCH_SIZE)
 
-      scraperLog.batch(this.name, batchNum, totalBatches, batch)
-
-      // Execute batch in parallel
       const results = await Promise.all(
         batch.map(routeKey => this.scrapeRoute(routeKey))
       )
 
-      // Add results
-      for (let j = 0; j < results.length; j++) {
-        const result = results[j]
-        const routeKey = batch[j]
+      for (const result of results) {
         allProducts.push(...result.data)
         allErrors.push(...result.errors)
-        scraperLog.route(this.name, routeKey, result.data.length)
       }
 
-      // Delay between batches (except the last one)
-      if (i + BATCH_SIZE < routesToScrape.length) {
+      if (i + BATCH_SIZE < routeKeys.length) {
         await this.delay(BATCH_DELAY_MS)
       }
     }
@@ -121,15 +207,10 @@ export class SuperseisScraper {
     }
   }
 
-  // Scrape offers only (for quick use)
-  async scrapeOfertas(): Promise<ScraperResult<ScrapedProductWithCategory>> {
-    return this.scrapeRoute('ofertas')
-  }
-
   async scrapePage(url: string, category: string): Promise<{ products: ScrapedProductWithCategory[]; totalPages: number }> {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'es-ES,es;q=0.9',
       },
@@ -151,27 +232,24 @@ export class SuperseisScraper {
     $(selectors.productContainer).each((_, element) => {
       const $el = $(element)
 
-      const name = $el.find(selectors.name).attr(selectors.nameAttr) ||
-        $el.find(selectors.name).text().trim()
+      const name = selectors.nameAttr
+        ? $el.find(selectors.name).attr(selectors.nameAttr)
+        : $el.find(selectors.name).text().trim()
 
       const priceNew = parsePrice($el.find(selectors.priceNew).text())
       const priceOld = parsePrice($el.find(selectors.priceOld).text())
 
       if (!name || !priceNew) return
 
-      const product: ScrapedProductWithCategory = {
+      products.push({
         name,
         price: priceNew,
         oldPrice: priceOld || undefined,
         discountPercent: parseDiscount($el.find(selectors.discountPercent).text()) || undefined,
         imageUrl: $el.find(selectors.image).attr('src') || undefined,
         sourceUrl: $el.find(selectors.url).attr('href') || sourceUrl,
-        unit: $el.find(selectors.saleType).text().trim() || undefined,
-        externalId: $el.find(selectors.productId).attr('data-product-id') || undefined,
         category,
-      }
-
-      products.push(product)
+      })
     })
 
     let totalPages = 1
@@ -198,63 +276,37 @@ export class SuperseisScraper {
 
     let saved = 0
     let updated = 0
-    const seen = new Set<string>() // To avoid duplicates in the same batch
+    const seen = new Set<string>()
 
     for (const product of products) {
       const normalizedName = this.normalizeName(product.name)
-      const parsed = parseProductName(normalizedName)
 
-      // Skip if we already processed this product in this batch
       if (seen.has(normalizedName)) continue
       seen.add(normalizedName)
 
       try {
         const existing = await db.product.findUnique({
-          where: {
-            storeId_normalizedName: {
-              storeId: store.id,
-              normalizedName,
-            },
-          },
+          where: { storeId_normalizedName: { storeId: store.id, normalizedName } },
         })
 
         const dbProduct = await db.product.upsert({
-          where: {
-            storeId_normalizedName: {
-              storeId: store.id,
-              normalizedName,
-            },
-          },
+          where: { storeId_normalizedName: { storeId: store.id, normalizedName } },
           update: {
             name: product.name,
-            baseNormalizedName: parsed.baseName,
-            quantity: parsed.quantity,
-            unit: parsed.unit,
             imageUrl: product.imageUrl,
             category: product.category,
-            externalId: product.externalId,
-            updatedAt: new Date(),
           },
           create: {
             name: product.name,
             normalizedName,
-            baseNormalizedName: parsed.baseName,
-            quantity: parsed.quantity,
-            unit: parsed.unit,
             imageUrl: product.imageUrl,
             category: product.category,
-            externalId: product.externalId,
             storeId: store.id,
           },
         })
 
-        if (existing) {
-          updated++
-        } else {
-          saved++
-        }
+        existing ? updated++ : saved++
 
-        // Create price record
         await db.price.create({
           data: {
             price: product.price,
@@ -264,7 +316,6 @@ export class SuperseisScraper {
             storeId: store.id,
           },
         })
-
       } catch (error) {
         logger.error(`Error saving "${product.name}":`, error)
       }
@@ -292,44 +343,22 @@ export class SuperseisScraper {
 const isMainModule = import.meta.url === `file://${process.argv[1]}`
 if (isMainModule) {
   const args = process.argv.slice(2)
-  const scraper = new SuperseisScraper()
-
-  // Parse arguments
-  const onlyOfertas = args.includes('--ofertas')
+  const scraper = new NuevaTiendaScraper()
   const saveToDb = args.includes('--save')
-  const specificRoute = args.find(a => a.startsWith('--route='))?.split('=')[1] as RouteKey | undefined
 
   logger.box([
-    `🛒 Superseis Scraper`,
+    `Nueva Tienda Scraper`,
     ``,
-    `   Mode: ${onlyOfertas ? 'Offers only' : specificRoute ? `Route: ${specificRoute}` : 'All categories'}`,
     `   Save: ${saveToDb ? 'Yes' : 'No (use --save to save)'}`,
   ].join('\n'))
 
-  let result: ScraperResult<ScrapedProductWithCategory>
+  const result = await scraper.scrapeAll()
 
-  if (onlyOfertas) {
-    result = await scraper.scrapeOfertas()
-  } else if (specificRoute) {
-    result = await scraper.scrapeRoute(specificRoute)
-  } else {
-    result = await scraper.scrapeAll()
-  }
-
-  // Final summary
   scraperLog.summary(scraper.name, {
     total: result.data.length,
     errors: result.errors.length,
     duration: result.duration,
   })
-
-  // Summary by category
-  const byCategory = result.data.reduce((acc, p) => {
-    acc[p.category] = (acc[p.category] || 0) + 1
-    return acc
-  }, {} as Record<string, number>)
-
-  scraperLog.categories(scraper.name, byCategory)
 
   if (saveToDb && result.data.length > 0) {
     logger.start('Guardando en base de datos...')
@@ -339,3 +368,81 @@ if (isMainModule) {
 
   await db.$disconnect()
 }
+```
+
+## Paso 4: Agregar Scripts NPM
+
+Agregar en `package.json`:
+
+```json
+{
+  "scripts": {
+    "scrape:nuevatienda": "tsx src/scrapers/supermercados/nuevatienda.ts",
+    "scrape:nuevatienda:save": "tsx src/scrapers/supermercados/nuevatienda.ts --save"
+  }
+}
+```
+
+## Paso 5: Agregar a scrape-all (Opcional)
+
+Si quieres incluirlo en el job principal:
+
+```typescript
+// src/jobs/scrape-all.ts
+
+import { NuevaTiendaScraper } from '../scrapers/supermercados/nuevatienda.js'
+
+const scrapers = [
+  new SuperseisScraper(),
+  new StockScraper(),
+  new NuevaTiendaScraper(),  // <-- Agregar aqui
+]
+```
+
+## Paso 6: Crear Tests
+
+Crear archivo en `src/scrapers/__tests__/nuevatienda.test.ts`:
+
+```typescript
+import { describe, it, expect } from 'vitest'
+import { NuevaTiendaScraper } from '../supermercados/nuevatienda'
+
+describe('NuevaTiendaScraper', () => {
+  const scraper = new NuevaTiendaScraper()
+
+  it('should have correct config', () => {
+    expect(scraper.name).toBe('Nueva Tienda')
+    expect(scraper.slug).toBe('nuevatienda')
+  })
+
+  it('should parse HTML correctly', () => {
+    const html = `
+      <div class="product-card">
+        <a class="product-link" href="/producto/1">
+          <span class="product-name">Producto Test</span>
+          <span class="current-price">Gs. 15.000</span>
+        </a>
+      </div>
+    `
+
+    const { products } = scraper.parseHtml(html, 'http://test.com', 'test')
+
+    expect(products).toHaveLength(1)
+    expect(products[0].name).toBe('Producto Test')
+    expect(products[0].price).toBe(15000)
+  })
+})
+```
+
+## Checklist Final
+
+- [ ] Archivo de configuracion creado
+- [ ] Clase scraper implementada
+- [ ] Selectores CSS verificados
+- [ ] Paginacion funcionando
+- [ ] Normalizacion de nombres
+- [ ] Scripts npm agregados
+- [ ] Tests creados
+- [ ] Probar dry run: `npm run scrape:nuevatienda`
+- [ ] Probar con guardado: `npm run scrape:nuevatienda:save`
+- [ ] Verificar datos en DB: `npm run db:studio`

@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio'
 import { casaricaConfig, type CasaRicaRouteKey } from '../config/casarica'
 import { db } from '../../lib/db'
 import { scraperLog, logger } from '../../lib/logger'
+import { parseProductName } from '../../lib/matching/fuzzy-matcher'
 import type { ScrapedProduct, ScraperResult } from '../../types/index'
 
 interface CasaRicaProduct extends ScrapedProduct {
@@ -218,6 +219,7 @@ export class CasaRicaScraper {
 
         for (const product of products) {
             const normalizedName = this.normalizeName(product.name)
+            const parsed = parseProductName(normalizedName)
 
             if (seen.has(normalizedName)) continue
             seen.add(normalizedName)
@@ -241,6 +243,9 @@ export class CasaRicaScraper {
                             data: {
                                 name: product.name,
                                 normalizedName,
+                                baseNormalizedName: parsed.baseName,
+                                quantity: parsed.quantity,
+                                unit: parsed.unit,
                                 imageUrl: product.imageUrl,
                                 category: product.category,
                                 barcode: product.barcode,
@@ -271,6 +276,9 @@ export class CasaRicaScraper {
                         },
                         update: {
                             name: product.name,
+                            baseNormalizedName: parsed.baseName,
+                            quantity: parsed.quantity,
+                            unit: parsed.unit,
                             imageUrl: product.imageUrl,
                             category: product.category,
                             barcode: product.barcode,
@@ -280,6 +288,9 @@ export class CasaRicaScraper {
                         create: {
                             name: product.name,
                             normalizedName,
+                            baseNormalizedName: parsed.baseName,
+                            quantity: parsed.quantity,
+                            unit: parsed.unit,
                             imageUrl: product.imageUrl,
                             category: product.category,
                             barcode: product.barcode,

@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio'
 import { salemmaConfig, type SalemmaRouteKey } from '../config/salemma'
 import { db } from '../../lib/db'
 import { scraperLog, logger } from '../../lib/logger'
+import { parseProductName } from '../../lib/matching/fuzzy-matcher'
 import type { ScrapedProduct, ScraperResult } from '../../types/index'
 
 interface SalemmaProduct extends ScrapedProduct {
@@ -236,6 +237,7 @@ export class SalemmaScraper {
 
         for (const product of products) {
             const normalizedName = this.normalizeName(product.name)
+            const parsed = parseProductName(normalizedName)
 
             // Skip duplicates by normalized name
             if (seenNames.has(normalizedName)) {
@@ -271,6 +273,9 @@ export class SalemmaScraper {
                     },
                     update: {
                         name: product.name,
+                        baseNormalizedName: parsed.baseName,
+                        quantity: parsed.quantity,
+                        unit: parsed.unit,
                         imageUrl: product.imageUrl,
                         category: product.category,
                         barcode: product.barcode,
@@ -280,6 +285,9 @@ export class SalemmaScraper {
                     create: {
                         name: product.name,
                         normalizedName,
+                        baseNormalizedName: parsed.baseName,
+                        quantity: parsed.quantity,
+                        unit: parsed.unit,
                         imageUrl: product.imageUrl,
                         category: product.category,
                         barcode: product.barcode,

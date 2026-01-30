@@ -39,7 +39,12 @@
     "test:matching": "tsx src/scripts/test-matching.ts",
     "match:process": "tsx src/jobs/process-matches.ts",
     "match:stats": "tsx src/jobs/process-matches.ts --stats",
-    "compare:v2": "tsx src/scripts/compare-v2.ts"
+    "compare:v2": "tsx src/scripts/compare-v2.ts",
+    "suspicious": "tsx src/scripts/find-suspicious-matches.ts",
+    "unmatch": "tsx src/scripts/unmatch-product.ts",
+    "migrate:measurements": "tsx src/scripts/migrate-extract-measurements.ts",
+    "mismatches": "tsx src/scripts/find-measurement-mismatches.ts",
+    "fix:mismatches": "tsx src/scripts/fix-measurement-mismatches.ts"
   },
   "devDependencies": {
     "@hookform/resolvers": "^5.2.2",

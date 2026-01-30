@@ -119,37 +119,104 @@ export function normalizeProductName(name: string): string {
  * Extrae cantidad y unidad de un nombre de producto
  */
 export function extractQuantityUnit(name: string): { quantity: number | null; unit: string | null } {
+  const parsed = parseProductName(name)
+  return { quantity: parsed.quantity, unit: parsed.unit }
+}
+
+export interface ParsedProductName {
+  baseName: string        // Name without measurement (e.g., "coca cola original")
+  quantity: number | null // Numeric value (e.g., 2)
+  unit: string | null     // Normalized unit (e.g., "l")
+  originalMatch: string | null // The original measurement text that was removed
+}
+
+/**
+ * Extrae medidas del nombre ORIGINAL (sin normalizar) para preservar decimales
+ */
+export function extractMeasurementFromOriginal(name: string): {
+  quantity: number | null
+  unit: string | null
+  matchedText: string | null
+} {
+  // Patrones para detectar medidas (aplicados al nombre ORIGINAL con puntos/comas)
   const patterns = [
-    // 2000 ml, 2000ml, 2.5 l, 2,5l
-    /(\d+(?:[.,]\d+)?)\s*(ml|l|lt|lts|litro|litros)/i,
-    // 500 g, 500gr, 1 kg, 1.5kg
-    /(\d+(?:[.,]\d+)?)\s*(g|gr|kg|kgs|gramo|gramos|kilo|kilos)/i,
-    // 6 unidades, 12 un
-    /(\d+)\s*(un|und|unid|unidad|unidades)/i,
+    // Volumen: 2000 ml, 2000ml, 2.5 l, 2,5l, 1 litro, etc.
+    /(\d+(?:[.,]\d+)?)\s*(ml|l|lt|lts|litro|litros)\b/gi,
+    // Peso: 500 g, 500gr, 1 kg, 1.5kg, etc.
+    /(\d+(?:[.,]\d+)?)\s*(g|gr|kg|kgs|gramo|gramos|kilo|kilos)\b/gi,
+    // Unidades: 6 unidades, 12 un, x6, x12, pack 6, etc.
+    /(?:x|pack\s*)?(\d+)\s*(un|und|unid|unidad|unidades)\b/gi,
+    // Formato "x6" o "x12" sin unidad explícita
+    /\bx(\d+)\b/gi,
+    // Centímetros cúbicos: 500cc, 1000 cc
+    /(\d+(?:[.,]\d+)?)\s*(cc)\b/gi,
   ]
 
   for (const pattern of patterns) {
     const match = name.match(pattern)
     if (match) {
-      let quantity = parseFloat(match[1].replace(',', '.'))
-      let unit = match[2].toLowerCase()
+      const fullMatch = match[0]
 
-      // Normalizar unidades
-      if (['l', 'lt', 'lts', 'litro', 'litros'].includes(unit)) {
-        unit = 'l'
-      } else if (['ml'].includes(unit)) {
-        unit = 'ml'
-      } else if (['kg', 'kgs', 'kilo', 'kilos'].includes(unit)) {
-        unit = 'kg'
-      } else if (['g', 'gr', 'gramo', 'gramos'].includes(unit)) {
-        unit = 'g'
-      } else if (['un', 'und', 'unid', 'unidad', 'unidades'].includes(unit)) {
-        unit = 'un'
+      // Extraer número y unidad del match
+      const numMatch = fullMatch.match(/(\d+(?:[.,]\d+)?)/)
+      const unitMatch = fullMatch.match(/(ml|l|lt|lts|litro|litros|g|gr|kg|kgs|gramo|gramos|kilo|kilos|un|und|unid|unidad|unidades|cc)/i)
+
+      if (numMatch) {
+        const quantity = parseFloat(numMatch[1].replace(',', '.'))
+        let unit: string | null = null
+
+        if (unitMatch) {
+          const rawUnit = unitMatch[1].toLowerCase()
+
+          // Normalizar unidades
+          if (['l', 'lt', 'lts', 'litro', 'litros'].includes(rawUnit)) {
+            unit = 'l'
+          } else if (['ml', 'cc'].includes(rawUnit)) {
+            unit = 'ml'
+          } else if (['kg', 'kgs', 'kilo', 'kilos'].includes(rawUnit)) {
+            unit = 'kg'
+          } else if (['g', 'gr', 'gramo', 'gramos'].includes(rawUnit)) {
+            unit = 'g'
+          } else if (['un', 'und', 'unid', 'unidad', 'unidades'].includes(rawUnit)) {
+            unit = 'un'
+          }
+        } else if (fullMatch.match(/^x\d+$/i)) {
+          // Formato "x6" sin unidad = unidades
+          unit = 'un'
+        }
+
+        return { quantity, unit, matchedText: fullMatch }
       }
-
-      return { quantity, unit }
     }
   }
 
-  return { quantity: null, unit: null }
+  return { quantity: null, unit: null, matchedText: null }
+}
+
+/**
+ * Parsea un nombre de producto extrayendo el nombre base y la medida
+ *
+ * IMPORTANTE: Extrae medidas del nombre ORIGINAL (antes de normalizar)
+ * para preservar decimales como "1.5 Lt" o "2,5L"
+ *
+ * Ejemplo:
+ *   "Coca Cola Original 2L" → { baseName: "coca cola original", quantity: 2, unit: "l" }
+ *   "Jugo 1.5 Lt" → { baseName: "jugo", quantity: 1.5, unit: "l" }
+ *   "Gaseosa 2,5L" → { baseName: "gaseosa", quantity: 2.5, unit: "l" }
+ */
+export function parseProductName(name: string): ParsedProductName {
+  // 1. Extraer medidas del nombre ORIGINAL (antes de normalizar)
+  const { quantity, unit, matchedText } = extractMeasurementFromOriginal(name)
+
+  // 2. Normalizar el nombre completo
+  const normalized = normalizeProductName(name)
+
+  // 3. Calcular baseName removiendo la medida del nombre normalizado
+  let baseName = normalized
+  if (matchedText) {
+    const normalizedMatch = normalizeProductName(matchedText)
+    baseName = normalized.replace(normalizedMatch, ' ').replace(/\s+/g, ' ').trim()
+  }
+
+  return { baseName, quantity, unit, originalMatch: matchedText }
 }

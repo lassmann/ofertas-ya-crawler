@@ -48,7 +48,8 @@ export function MatchedProducts() {
         limit: 30,
         search: debouncedSearch || undefined,
         category: category || undefined,
-        minStores: 2,
+        minStores: 1,
+        sort: 'discount',
       }),
     getNextPageParam: (lastPage) => {
       if (lastPage.pagination.page < lastPage.pagination.totalPages) {
@@ -94,7 +95,7 @@ export function MatchedProducts() {
       <div>
         <h1 className="text-2xl font-bold">Comparar Precios</h1>
         <p className="text-muted-foreground">
-          Productos disponibles en multiples tiendas para comparar precios
+          Todos los productos disponibles para comparar precios
         </p>
       </div>
 
@@ -180,19 +181,11 @@ export function MatchedProducts() {
                           <span className="font-medium text-red-600">
                             {formatPrice(product.maxPrice)}
                           </span>
-                          {product.priceDifferencePercent > 0 && (
-                            <Badge
-                              variant={product.priceDifferencePercent > 30 ? 'destructive' : 'secondary'}
-                              className="ml-1 text-xs"
-                            >
-                              +{product.priceDifferencePercent}%
-                            </Badge>
-                          )}
                         </div>
 
-                        {product.cheapestStore && (
-                          <p className="text-xs text-green-600">
-                            Mas barato en {product.cheapestStore}
+                        {product.cheapestStore && product.priceDifferencePercent > 0 && (
+                          <p className="text-xs text-green-600 font-medium">
+                            -{product.priceDifferencePercent}% en {product.cheapestStore}
                           </p>
                         )}
                       </div>

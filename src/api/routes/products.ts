@@ -81,11 +81,14 @@ productsRouter.get('/unmatched', async (req, res) => {
 // GET /api/products/matched - Canonical products with matches in multiple stores
 productsRouter.get('/matched', async (req, res) => {
   try {
-    const { category, search, minStores = '2', page = '1', limit = '50' } = req.query
+    const { category, search, minStores = '2', page = '1', limit = '50', sort } = req.query
     const pageNum = parseInt(page as string, 10)
     const limitNum = Math.min(parseInt(limit as string, 10), 100)
     const minStoresNum = parseInt(minStores as string, 10)
-    const offset = (pageNum - 1) * limitNum
+    const sortByDiscount = sort === 'discount'
+    // When sorting by discount, fetch more to sort properly, otherwise use offset
+    const offset = sortByDiscount ? 0 : (pageNum - 1) * limitNum
+    const fetchLimit = sortByDiscount ? 500 : limitNum // Fetch more when sorting by discount
 
     // Build the WHERE clause conditionally
     const categoryCondition = category
@@ -119,7 +122,7 @@ productsRouter.get('/matched', async (req, res) => {
       GROUP BY cp.id
       HAVING COUNT(DISTINCT p."storeId") >= ${minStoresNum}
       ORDER BY "storeCount" DESC, cp.name
-      LIMIT ${limitNum}
+      LIMIT ${fetchLimit}
       OFFSET ${offset}
     `
 
@@ -188,8 +191,16 @@ productsRouter.get('/matched', async (req, res) => {
       })
     )
 
+    // Sort by discount if requested, then paginate
+    let finalData = data
+    if (sortByDiscount) {
+      finalData = data
+        .sort((a, b) => b.priceDifferencePercent - a.priceDifferencePercent)
+        .slice((pageNum - 1) * limitNum, pageNum * limitNum)
+    }
+
     res.json({
-      data,
+      data: finalData,
       pagination: {
         page: pageNum,
         limit: limitNum,

@@ -5,6 +5,7 @@ import type { Product, CanonicalProduct } from '../../generated/prisma/client.js
 
 const FUZZY_THRESHOLD = 0.4 // pg_trgm default threshold
 const HIGH_CONFIDENCE_THRESHOLD = 0.85
+const BASE_NAME_SIMILARITY_THRESHOLD = 0.7 // Lower threshold for base names (without measurements)
 
 interface MatchStats {
   total: number
@@ -19,7 +20,10 @@ interface MatchStats {
 interface FuzzyMatchResult {
   id: string
   normalizedName: string
+  baseNormalizedName: string | null
   name: string
+  quantity: number | null
+  unit: string | null
   similarity: number
 }
 
@@ -52,33 +56,134 @@ async function matchByAlias(product: Product): Promise<CanonicalProduct | null> 
 }
 
 /**
+ * Verifica si dos productos tienen medidas compatibles
+ * Compatible significa: ambos null, o ambos tienen el mismo valor
+ * Exportado para testing
+ */
+export function areMeasurementsCompatible(
+  qty1: number | null,
+  unit1: string | null,
+  qty2: number | null,
+  unit2: string | null
+): boolean {
+  // Si ambos no tienen medida, son compatibles
+  if (qty1 === null && qty2 === null) return true
+
+  // Si uno tiene medida y el otro no, NO son compatibles (esto previene matches incorrectos)
+  if ((qty1 === null) !== (qty2 === null)) return false
+
+  // Ambos tienen medidas - deben coincidir
+  // Normalizar unidades equivalentes (1l = 1000ml, 1kg = 1000g)
+  let normalizedQty1 = qty1!
+  let normalizedUnit1 = unit1
+  let normalizedQty2 = qty2!
+  let normalizedUnit2 = unit2
+
+  // Convertir litros a ml
+  if (unit1 === 'l') {
+    normalizedQty1 = qty1! * 1000
+    normalizedUnit1 = 'ml'
+  }
+  if (unit2 === 'l') {
+    normalizedQty2 = qty2! * 1000
+    normalizedUnit2 = 'ml'
+  }
+
+  // Convertir kg a g
+  if (unit1 === 'kg') {
+    normalizedQty1 = qty1! * 1000
+    normalizedUnit1 = 'g'
+  }
+  if (unit2 === 'kg') {
+    normalizedQty2 = qty2! * 1000
+    normalizedUnit2 = 'g'
+  }
+
+  // Las unidades deben ser iguales después de normalizar
+  if (normalizedUnit1 !== normalizedUnit2) return false
+
+  // Las cantidades deben ser iguales (con tolerancia del 1% para errores de redondeo)
+  const tolerance = Math.max(normalizedQty1, normalizedQty2) * 0.01
+  return Math.abs(normalizedQty1 - normalizedQty2) <= tolerance
+}
+
+/**
  * NIVEL 3: Match por similitud fuzzy con pg_trgm
+ * Ahora valida que las medidas (quantity/unit) sean compatibles
  * 60-95% confianza dependiendo del score
  */
 async function matchByFuzzy(product: Product): Promise<{ canonical: CanonicalProduct; confidence: number } | null> {
+  // Estrategia 1: Si tenemos baseNormalizedName, buscar por base name + validar medidas
+  if (product.baseNormalizedName) {
+    const baseResults = await db.$queryRaw<FuzzyMatchResult[]>`
+      SELECT
+        cp.id,
+        cp."normalizedName",
+        cp."baseNormalizedName",
+        cp.name,
+        cp.quantity,
+        cp.unit,
+        similarity(cp."baseNormalizedName", ${product.baseNormalizedName}) as similarity
+      FROM "CanonicalProduct" cp
+      WHERE cp."baseNormalizedName" IS NOT NULL
+        AND cp."baseNormalizedName" % ${product.baseNormalizedName}
+      ORDER BY similarity DESC
+      LIMIT 10
+    `
+
+    // Filtrar por medidas compatibles
+    for (const match of baseResults) {
+      if (areMeasurementsCompatible(product.quantity, product.unit, match.quantity, match.unit)) {
+        // Tenemos un match con medidas compatibles
+        if (match.similarity >= BASE_NAME_SIMILARITY_THRESHOLD) {
+          const canonical = await db.canonicalProduct.findUnique({ where: { id: match.id } })
+          if (canonical) {
+            // Ajustar confianza: base similarity + bonus por medidas exactas
+            const confidence = Math.min(match.similarity + 0.1, 0.95)
+            return { canonical, confidence }
+          }
+        }
+      } else {
+        logger.debug(`[Matching] Rejected base match "${product.baseNormalizedName}" ↔ "${match.baseNormalizedName}": measurement mismatch (${product.quantity ?? 'null'}${product.unit ?? ''} vs ${match.quantity ?? 'null'}${match.unit ?? ''})`)
+      }
+    }
+  }
+
+  // Estrategia 2: Fallback a normalizedName completo (comportamiento anterior)
   const results = await db.$queryRaw<FuzzyMatchResult[]>`
     SELECT
       cp.id,
       cp."normalizedName",
+      cp."baseNormalizedName",
       cp.name,
+      cp.quantity,
+      cp.unit,
       similarity(cp."normalizedName", ${product.normalizedName}) as similarity
     FROM "CanonicalProduct" cp
     WHERE cp."normalizedName" % ${product.normalizedName}
     ORDER BY similarity DESC
-    LIMIT 1
+    LIMIT 5
   `
 
-  if (results.length === 0) return null
+  // También validar medidas en el fallback
+  for (const match of results) {
+    // Si ambos tienen medidas, deben ser compatibles
+    if (product.quantity !== null && match.quantity !== null) {
+      if (!areMeasurementsCompatible(product.quantity, product.unit, match.quantity, match.unit)) {
+        logger.debug(`[Matching] Rejected fuzzy match "${product.normalizedName}" ↔ "${match.normalizedName}": measurement mismatch (${product.quantity}${product.unit ?? ''} vs ${match.quantity}${match.unit ?? ''})`)
+        continue // Skip - medidas incompatibles
+      }
+    }
 
-  const match = results[0]
-  const canonical = await db.canonicalProduct.findUnique({ where: { id: match.id } })
-
-  if (!canonical) return null
-
-  return {
-    canonical,
-    confidence: match.similarity
+    if (match.similarity >= HIGH_CONFIDENCE_THRESHOLD) {
+      const canonical = await db.canonicalProduct.findUnique({ where: { id: match.id } })
+      if (canonical) {
+        return { canonical, confidence: match.similarity }
+      }
+    }
   }
+
+  return null
 }
 
 /**
@@ -89,6 +194,7 @@ async function createCanonicalFromProduct(product: Product): Promise<CanonicalPr
     data: {
       name: product.name,
       normalizedName: product.normalizedName,
+      baseNormalizedName: product.baseNormalizedName,
       brand: product.brand,
       category: product.category,
       quantity: product.quantity,

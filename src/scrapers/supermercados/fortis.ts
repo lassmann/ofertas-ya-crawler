@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio'
 import { fortisConfig, type FortisRouteKey } from '../config/fortis'
 import { db } from '../../lib/db.js'
 import { scraperLog, logger } from '../../lib/logger'
+import { parseProductName } from '../../lib/matching/fuzzy-matcher'
 import type { ScrapedProduct, ScraperResult } from '../../types/index'
 
 interface FortisProduct extends ScrapedProduct {
@@ -232,6 +233,7 @@ export class FortisScraper {
 
         for (const product of products) {
             const normalizedName = this.normalizeName(product.name)
+            const parsed = parseProductName(normalizedName)
 
             if (seen.has(normalizedName)) continue
             seen.add(normalizedName)
@@ -255,6 +257,9 @@ export class FortisScraper {
                     },
                     update: {
                         name: product.name,
+                        baseNormalizedName: parsed.baseName,
+                        quantity: parsed.quantity,
+                        unit: parsed.unit,
                         imageUrl: product.imageUrl,
                         category: product.category,
                         externalId: product.externalId,
@@ -264,6 +269,9 @@ export class FortisScraper {
                     create: {
                         name: product.name,
                         normalizedName,
+                        baseNormalizedName: parsed.baseName,
+                        quantity: parsed.quantity,
+                        unit: parsed.unit,
                         imageUrl: product.imageUrl,
                         category: product.category,
                         externalId: product.externalId,
