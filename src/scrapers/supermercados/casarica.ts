@@ -223,45 +223,76 @@ export class CasaRicaScraper {
             seen.add(normalizedName)
 
             try {
-                const existing = await db.product.findUnique({
-                    where: {
-                        storeId_normalizedName: {
-                            storeId: store.id,
-                            normalizedName,
-                        },
-                    },
-                })
+                let dbProduct
 
-                const dbProduct = await db.product.upsert({
-                    where: {
-                        storeId_normalizedName: {
+                // First, try to find by externalId if available (more reliable identifier)
+                if (product.externalId) {
+                    const existingByExternalId = await db.product.findFirst({
+                        where: {
                             storeId: store.id,
-                            normalizedName,
+                            externalId: product.externalId,
                         },
-                    },
-                    update: {
-                        name: product.name,
-                        imageUrl: product.imageUrl,
-                        category: product.category,
-                        barcode: product.barcode,
-                        externalId: product.externalId,
-                        updatedAt: new Date(),
-                    },
-                    create: {
-                        name: product.name,
-                        normalizedName,
-                        imageUrl: product.imageUrl,
-                        category: product.category,
-                        barcode: product.barcode,
-                        externalId: product.externalId,
-                        storeId: store.id,
-                    },
-                })
+                    })
 
-                if (existing) {
-                    updated++
-                } else {
-                    saved++
+                    if (existingByExternalId) {
+                        // Update existing product found by externalId
+                        dbProduct = await db.product.update({
+                            where: { id: existingByExternalId.id },
+                            data: {
+                                name: product.name,
+                                normalizedName,
+                                imageUrl: product.imageUrl,
+                                category: product.category,
+                                barcode: product.barcode,
+                                updatedAt: new Date(),
+                            },
+                        })
+                        updated++
+                    }
+                }
+
+                // If not found by externalId, upsert by normalizedName
+                if (!dbProduct) {
+                    const existing = await db.product.findUnique({
+                        where: {
+                            storeId_normalizedName: {
+                                storeId: store.id,
+                                normalizedName,
+                            },
+                        },
+                    })
+
+                    dbProduct = await db.product.upsert({
+                        where: {
+                            storeId_normalizedName: {
+                                storeId: store.id,
+                                normalizedName,
+                            },
+                        },
+                        update: {
+                            name: product.name,
+                            imageUrl: product.imageUrl,
+                            category: product.category,
+                            barcode: product.barcode,
+                            externalId: product.externalId,
+                            updatedAt: new Date(),
+                        },
+                        create: {
+                            name: product.name,
+                            normalizedName,
+                            imageUrl: product.imageUrl,
+                            category: product.category,
+                            barcode: product.barcode,
+                            externalId: product.externalId,
+                            storeId: store.id,
+                        },
+                    })
+
+                    if (existing) {
+                        updated++
+                    } else {
+                        saved++
+                    }
                 }
 
                 await db.price.create({

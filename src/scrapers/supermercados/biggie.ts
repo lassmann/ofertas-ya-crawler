@@ -3,6 +3,17 @@ import { db } from '../../lib/db'
 import { scraperLog, logger } from '../../lib/logger'
 import type { ScrapedProduct, ScraperResult } from '../../types/index'
 
+function slugify(text: string): string {
+    return text
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Quitar acentos
+        .replace(/[^a-z0-9\s-]/g, '')    // Solo alfanuméricos, espacios y guiones
+        .replace(/\s+/g, '-')            // Espacios a guiones
+        .replace(/-+/g, '-')             // Múltiples guiones a uno
+        .trim()
+}
+
 interface BiggieApiImage {
     id: number
     src: string
@@ -173,8 +184,9 @@ export class BiggieScraper {
             // Get first image (type=0 is full size)
             const imageUrl = item.images?.[0]?.src
 
-            // Construct product URL
-            const sourceUrl = `${this.config.baseUrl}/producto/${item.code}`
+            // Construct product URL: https://biggie.com.py/item/{slug}-{code}
+            const slug = slugify(item.name)
+            const sourceUrl = `${this.config.baseUrl}/item/${slug}-${item.code}`
 
             return {
                 name: item.name,
