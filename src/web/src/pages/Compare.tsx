@@ -24,7 +24,10 @@ import {
   Tag,
   Clock,
   X,
+  Star,
+  Pencil,
 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +48,8 @@ export function Compare() {
     productName: string
     storeName: string
   } | null>(null)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [displayNameInput, setDisplayNameInput] = useState('')
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['compare', id],
@@ -57,6 +62,27 @@ export function Compare() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['compare', id] })
       setUnmatchDialog(null)
+    },
+  })
+
+  const featuredMutation = useMutation({
+    mutationFn: async ({ action, featuredId }: { action: 'create' | 'delete'; featuredId?: string }) => {
+      if (action === 'create') {
+        return api.createFeaturedOffer(id!)
+      } else {
+        return api.deleteFeaturedOffer(featuredId!)
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['compare', id] })
+    },
+  })
+
+  const displayNameMutation = useMutation({
+    mutationFn: (displayName: string) => api.updateCanonicalDisplayName(id!, displayName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['compare', id] })
+      setIsEditingName(false)
     },
   })
 
@@ -82,7 +108,8 @@ export function Compare() {
     )
   }
 
-  const { canonical, stores, cheapest, mostExpensive, priceDifference, priceDifferencePercent } = data
+  const { canonical, stores, cheapest, mostExpensive, priceDifference, priceDifferencePercent, featuredOffer } = data
+  const isFeatured = !!featuredOffer
 
   return (
     <div className="space-y-6">
@@ -96,7 +123,69 @@ export function Compare() {
 
       {/* Product Header */}
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold">{canonical.name}</h1>
+        <div className="flex items-center gap-2">
+          {isEditingName ? (
+            <div className="flex items-center gap-2 flex-1">
+              <Input
+                value={displayNameInput}
+                onChange={(e) => setDisplayNameInput(e.target.value)}
+                placeholder={canonical.name}
+                className="max-w-md"
+                autoFocus
+              />
+              <Button
+                size="sm"
+                onClick={() => displayNameMutation.mutate(displayNameInput)}
+                disabled={displayNameMutation.isPending}
+              >
+                {displayNameMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                Guardar
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setIsEditingName(false)}
+                disabled={displayNameMutation.isPending}
+              >
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold">{canonical.displayName || canonical.name}</h1>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  if (isFeatured) {
+                    featuredMutation.mutate({ action: 'delete', featuredId: featuredOffer.id })
+                  } else {
+                    featuredMutation.mutate({ action: 'create' })
+                  }
+                }}
+                disabled={featuredMutation.isPending}
+                title={isFeatured ? 'Quitar de destacados' : 'Agregar a destacados'}
+              >
+                {featuredMutation.isPending ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Star className={cn('h-5 w-5', isFeatured && 'fill-yellow-400 text-yellow-400')} />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setDisplayNameInput(canonical.displayName || canonical.name)
+                  setIsEditingName(true)
+                }}
+                title="Editar nombre"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           {canonical.category && (
             <Badge variant="secondary">{formatCategory(canonical.category)}</Badge>
@@ -108,6 +197,12 @@ export function Compare() {
             <Store className="h-3 w-3" />
             {stores.length} tiendas
           </Badge>
+          {isFeatured && (
+            <Badge variant="default" className="bg-yellow-500">
+              <Star className="h-3 w-3 mr-1 fill-current" />
+              Destacado
+            </Badge>
+          )}
         </div>
       </div>
 

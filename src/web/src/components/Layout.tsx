@@ -38,7 +38,7 @@ export function Layout({ children }: LayoutProps) {
                       className={cn(
                         'flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors',
                         isActive
-                          ? 'bg-primary/10 text-primary'
+                          ? 'bg-blue-100 text-blue-600'
                           : 'text-gray-600 hover:bg-gray-100'
                       )}
                     >
@@ -64,7 +64,7 @@ export function Layout({ children }: LayoutProps) {
                 to={item.href}
                 className={cn(
                   'flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors',
-                  isActive ? 'text-primary' : 'text-gray-500'
+                  isActive ? 'text-blue-600' : 'text-gray-500'
                 )}
               >
                 <item.icon className="h-5 w-5" />

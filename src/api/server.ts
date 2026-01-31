@@ -6,6 +6,7 @@ import { compareRouter } from './routes/compare.js'
 import { matchesRouter } from './routes/matches.js'
 import { statsRouter } from './routes/stats.js'
 import { featuredRouter } from './routes/featured.js'
+import { canonicalRouter } from './routes/canonical.js'
 
 const app = express()
 const PORT = process.env.API_PORT || 3001
@@ -20,6 +21,7 @@ app.use('/api/compare', compareRouter)
 app.use('/api/matches', matchesRouter)
 app.use('/api/stats', statsRouter)
 app.use('/api/featured', featuredRouter)
+app.use('/api/canonical', canonicalRouter)
 
 // Health check
 app.get('/api/health', (_req, res) => {

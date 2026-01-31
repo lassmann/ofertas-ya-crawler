@@ -85,14 +85,22 @@ export interface StorePrice {
   confidence: number
 }
 
+export interface FeaturedOfferInfo {
+  id: string
+  displayOrder: number
+  isActive: boolean
+}
+
 export interface CompareResponse {
   canonical: {
     id: string
     name: string
+    displayName: string | null
     normalizedName: string
     category: string | null
     brand: string | null
   }
+  featuredOffer: FeaturedOfferInfo | null
   stores: StorePrice[]
   cheapest: StorePrice | null
   mostExpensive: StorePrice | null
@@ -245,6 +253,22 @@ export const api = {
   // Stats
   getStats: () => fetchApi<StatsResponse>('/stats'),
 
+  getPriceDifferences: (params: { page?: number; limit?: number }) => {
+    const query = new URLSearchParams()
+    if (params.page) query.set('page', params.page.toString())
+    if (params.limit) query.set('limit', params.limit.toString())
+    return fetchApi<PaginatedResponse<{
+      id: string
+      name: string
+      storeCount: number
+      minPrice: number
+      maxPrice: number
+      cheapestStore: string
+      mostExpensiveStore: string
+      priceDifferencePercent: number
+    }>>(`/stats/price-differences?${query}`)
+  },
+
   // Matches
   searchCanonical: (query: string) =>
     fetchApi<CanonicalSearchResult[]>(`/matches/canonical/search?q=${encodeURIComponent(query)}`),
@@ -299,4 +323,14 @@ export const api = {
     fetchApi<{ success: boolean; id: string }>(`/featured/${id}`, {
       method: 'DELETE',
     }),
+
+  // Canonical Products
+  updateCanonicalDisplayName: (id: string, displayName: string) =>
+    fetchApi<{ success: boolean; canonical: { id: string; name: string; displayName: string | null } }>(
+      `/canonical/${id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ displayName }),
+      }
+    ),
 }

@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { formatPrice } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Package,
   Link2,
@@ -12,12 +14,23 @@ import {
   AlertTriangle,
   ArrowRight,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 
+const PRICE_DIFFERENCES_LIMIT = 10
+
 export function Dashboard() {
+  const [priceDiffPage, setPriceDiffPage] = useState(1)
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ['stats'],
     queryFn: api.getStats,
+  })
+
+  const { data: priceDifferences, isLoading: isPriceDiffLoading } = useQuery({
+    queryKey: ['price-differences', priceDiffPage],
+    queryFn: () => api.getPriceDifferences({ page: priceDiffPage, limit: PRICE_DIFFERENCES_LIMIT }),
   })
 
   if (isLoading) {
@@ -161,43 +174,78 @@ export function Dashboard() {
       </div>
 
       {/* Top Price Differences */}
-      {stats.topPriceDifferences.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Mayores Diferencias de Precio
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {stats.topPriceDifferences.map((item) => (
-                <Link
-                  key={item.id}
-                  to={`/compare/${item.id}`}
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{item.name}</p>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span className="text-green-600">
-                        {formatPrice(item.minPrice)} ({item.cheapestStore})
-                      </span>
-                      <span>-</span>
-                      <span className="text-red-600">
-                        {formatPrice(item.maxPrice)} ({item.mostExpensiveStore})
-                      </span>
-                    </div>
-                  </div>
-                  <Badge variant={item.priceDifferencePercent > 30 ? 'destructive' : 'secondary'}>
-                    +{item.priceDifferencePercent}%
-                  </Badge>
-                </Link>
-              ))}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Mayores Diferencias de Precio
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isPriceDiffLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          </CardContent>
-        </Card>
-      )}
+          ) : priceDifferences && priceDifferences.data.length > 0 ? (
+            <>
+              <div className="space-y-4">
+                {priceDifferences.data.map((item) => (
+                  <Link
+                    key={item.id}
+                    to={`/compare/${item.id}`}
+                    className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{item.name}</p>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span className="text-green-600">
+                          {formatPrice(item.minPrice)} ({item.cheapestStore})
+                        </span>
+                        <span>-</span>
+                        <span className="text-red-600">
+                          {formatPrice(item.maxPrice)} ({item.mostExpensiveStore})
+                        </span>
+                      </div>
+                    </div>
+                    <Badge variant={item.priceDifferencePercent > 30 ? 'destructive' : 'secondary'}>
+                      +{item.priceDifferencePercent}%
+                    </Badge>
+                  </Link>
+                ))}
+              </div>
+              {priceDifferences.pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 mt-4 border-t">
+                  <span className="text-sm text-muted-foreground">
+                    Pagina {priceDifferences.pagination.page} de {priceDifferences.pagination.totalPages}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={priceDiffPage === 1}
+                      onClick={() => setPriceDiffPage(p => p - 1)}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={priceDiffPage >= priceDifferences.pagination.totalPages}
+                      onClick={() => setPriceDiffPage(p => p + 1)}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-muted-foreground text-center py-4">
+              No hay diferencias de precio para mostrar
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Products per Store */}
       <Card>

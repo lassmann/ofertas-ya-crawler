@@ -9,7 +9,16 @@ compareRouter.get('/:canonicalId', async (req, res) => {
     const { canonicalId } = req.params
 
     const canonical = await db.canonicalProduct.findUnique({
-      where: { id: canonicalId }
+      where: { id: canonicalId },
+      include: {
+        featuredOffer: {
+          select: {
+            id: true,
+            displayOrder: true,
+            isActive: true
+          }
+        }
+      }
     })
 
     if (!canonical) {
@@ -73,10 +82,12 @@ compareRouter.get('/:canonicalId', async (req, res) => {
       canonical: {
         id: canonical.id,
         name: canonical.name,
+        displayName: canonical.displayName,
         normalizedName: canonical.normalizedName,
         category: canonical.category,
         brand: canonical.brand
       },
+      featuredOffer: canonical.featuredOffer,
       stores,
       cheapest,
       mostExpensive,

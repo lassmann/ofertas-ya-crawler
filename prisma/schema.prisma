@@ -150,6 +150,7 @@ enum DiscountType {
 model CanonicalProduct {
   id                 String  @id @default(uuid())
   name               String // Nombre legible: "Coca-Cola Original 2L"
+  displayName        String? // Nombre para mostrar al usuario final (si es null, usa name)
   normalizedName     String  @unique
   baseNormalizedName String? // Name without quantity/unit for matching
   brand              String?
