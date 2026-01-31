@@ -152,6 +152,14 @@ export function extractMeasurementFromOriginal(name: string): {
     /(\d+(?:[.,]\d+)?)\s*(cc)\b/gi,
   ]
 
+  // Patrón especial: "x unidad" o "x un" SIN número = 1 unidad
+  // Ejemplo: "Chocolate Nucita crocante x unidad" → quantity: 1
+  const singleUnitPattern = /\bx\s*(un|und|unid|unidad)\b/gi
+  const singleMatch = name.match(singleUnitPattern)
+  if (singleMatch) {
+    return { quantity: 1, unit: 'un', matchedText: singleMatch[0] }
+  }
+
   for (const pattern of patterns) {
     const match = name.match(pattern)
     if (match) {

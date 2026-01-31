@@ -195,6 +195,34 @@ describe('parseProductName', () => {
       expect(result.quantity).toBe(10)
       expect(result.unit).toBe('un')
     })
+
+    it('should parse "x unidad" without number as 1 unit', () => {
+      const result = parseProductName('Chocolate Nucita crocante x unidad')
+      expect(result.baseName).toBe('chocolate nucita crocante')
+      expect(result.quantity).toBe(1)
+      expect(result.unit).toBe('un')
+    })
+
+    it('should parse "x un" without number as 1 unit', () => {
+      const result = parseProductName('Alfajor x un')
+      expect(result.baseName).toBe('alfajor')
+      expect(result.quantity).toBe(1)
+      expect(result.unit).toBe('un')
+    })
+
+    it('should parse "x und" without number as 1 unit', () => {
+      const result = parseProductName('Galletita x und')
+      expect(result.baseName).toBe('galletita')
+      expect(result.quantity).toBe(1)
+      expect(result.unit).toBe('un')
+    })
+
+    it('should parse "x unid" without number as 1 unit', () => {
+      const result = parseProductName('Caramelo x unid')
+      expect(result.baseName).toBe('caramelo')
+      expect(result.quantity).toBe(1)
+      expect(result.unit).toBe('un')
+    })
   })
 
   describe('Centimetros cubicos (cc)', () => {

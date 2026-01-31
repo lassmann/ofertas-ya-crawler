@@ -124,6 +124,46 @@ matchesRouter.get('/canonical/search', async (req, res) => {
   }
 })
 
+// DELETE /api/matches/:productId - Remove a match
+matchesRouter.delete('/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params
+    const hide = req.query.hide === 'true'
+
+    // Find the match
+    const match = await db.productMatch.findUnique({
+      where: { productId },
+      include: { product: true }
+    })
+
+    if (!match) {
+      return res.status(404).json({ error: 'Match not found' })
+    }
+
+    // Delete the match
+    await db.productMatch.delete({
+      where: { productId }
+    })
+
+    // Optionally hide the product
+    if (hide) {
+      await db.product.update({
+        where: { id: productId },
+        data: { isHidden: true }
+      })
+    }
+
+    res.json({
+      success: true,
+      productId,
+      hidden: hide
+    })
+  } catch (error) {
+    console.error('Error deleting match:', error)
+    res.status(500).json({ error: 'Failed to delete match' })
+  }
+})
+
 // POST /api/matches/canonical - Create a new canonical product and match
 matchesRouter.post('/canonical', async (req, res) => {
   try {

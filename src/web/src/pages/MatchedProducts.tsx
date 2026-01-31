@@ -5,13 +5,11 @@ import { api } from '@/lib/api'
 import { formatPrice, formatCategory } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Search,
   Loader2,
   Store,
-  ArrowRight,
 } from 'lucide-react'
 
 export function MatchedProducts() {
@@ -135,60 +133,40 @@ export function MatchedProducts() {
             {total.toLocaleString()} productos encontrados
           </p>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {products.map((product) => (
               <Link key={product.id} to={`/compare/${product.id}`}>
-                <Card className="h-full hover:border-primary transition-colors cursor-pointer">
-                  <CardContent className="p-3">
-                    <div className="flex gap-3">
-                      {/* Product Image */}
-                      <div className="flex-shrink-0">
-                        {product.imageUrl ? (
-                          <img
-                            src={product.imageUrl}
-                            alt={product.name}
-                            className="w-16 h-16 object-contain rounded-lg bg-gray-50"
-                          />
-                        ) : (
-                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                            <Store className="h-6 w-6 text-gray-300" />
-                          </div>
-                        )}
-                      </div>
+                <Card className="h-full hover:border-primary transition-colors cursor-pointer overflow-hidden">
+                  {/* Imagen grande arriba */}
+                  <div className="aspect-square bg-gray-50 p-4 flex items-center justify-center">
+                    {product.imageUrl ? (
+                      <img
+                        src={product.imageUrl}
+                        alt={product.name}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <Store className="h-16 w-16 text-gray-300" />
+                    )}
+                  </div>
 
-                      {/* Product Info */}
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <h3 className="font-semibold line-clamp-2 leading-tight text-sm">
-                          {product.name}
-                        </h3>
+                  {/* Info abajo */}
+                  <CardContent className="p-4 space-y-2">
+                    <h3 className="font-medium line-clamp-2 text-sm leading-tight min-h-[2.5rem]">
+                      {product.name}
+                    </h3>
 
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {product.category && (
-                            <Badge variant="secondary" className="text-xs">
-                              {formatCategory(product.category)}
-                            </Badge>
-                          )}
-                          <span className="text-xs text-muted-foreground">
-                            {product.storeCount} tiendas
-                          </span>
-                        </div>
+                    <p className="text-xl font-bold text-orange-500">
+                      {formatPrice(product.minPrice)}
+                    </p>
 
-                        <div className="flex items-center gap-1 text-sm">
-                          <span className="font-medium text-green-600">
-                            {formatPrice(product.minPrice)}
-                          </span>
-                          <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-medium text-red-600">
-                            {formatPrice(product.maxPrice)}
-                          </span>
-                        </div>
-
-                        {product.cheapestStore && product.priceDifferencePercent > 0 && (
-                          <p className="text-xs text-green-600 font-medium">
-                            -{product.priceDifferencePercent}% en {product.cheapestStore}
-                          </p>
-                        )}
-                      </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{product.storeCount} tiendas</span>
+                      {product.priceDifferencePercent > 0 && (
+                        <span className="text-green-600 font-medium">
+                          -{product.priceDifferencePercent}%
+                        </span>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

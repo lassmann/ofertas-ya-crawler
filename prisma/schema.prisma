@@ -47,6 +47,7 @@ model Product {
   barcode            String?  // EAN/UPC - not unique, same product can be in multiple stores
   externalId         String?  // Store's internal product ID (e.g., "12173" from Casa Rica)
   imageUrl           String?
+  isHidden           Boolean  @default(false) // Hide incorrectly matched or problematic products
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -160,8 +161,9 @@ model CanonicalProduct {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  matches ProductMatch[]
-  aliases CanonicalAlias[]
+  matches       ProductMatch[]
+  aliases       CanonicalAlias[]
+  featuredOffer FeaturedOffer?
 
   @@index([normalizedName])
   @@index([baseNormalizedName])
@@ -217,4 +219,21 @@ model PromotionDuplicate {
   createdAt       DateTime @default(now())
 
   @@unique([promotionId1, promotionId2])
+}
+
+// === FEATURED OFFERS ===
+
+model FeaturedOffer {
+  id String @id @default(uuid())
+
+  canonicalProduct   CanonicalProduct @relation(fields: [canonicalProductId], references: [id])
+  canonicalProductId String           @unique
+
+  displayOrder Int     @default(0)
+  isActive     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, displayOrder])
 }

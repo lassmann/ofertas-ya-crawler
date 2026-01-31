@@ -4,6 +4,105 @@ import { db } from '../../lib/db.js'
 
 export const productsRouter = Router()
 
+// GET /api/products - All products with optional filters
+productsRouter.get('/', async (req, res) => {
+  try {
+    const { storeId, category, search, page = '1', limit = '50' } = req.query
+    const pageNum = parseInt(page as string, 10)
+    const limitNum = Math.min(parseInt(limit as string, 10), 100)
+    const skip = (pageNum - 1) * limitNum
+
+    const where: Record<string, unknown> = {
+      isHidden: false
+    }
+
+    if (storeId) {
+      where.storeId = storeId as string
+    }
+
+    if (category) {
+      where.category = category as string
+    }
+
+    if (search) {
+      where.name = {
+        contains: search as string,
+        mode: 'insensitive'
+      }
+    }
+
+    const [products, total] = await Promise.all([
+      db.product.findMany({
+        where,
+        include: {
+          store: {
+            select: { id: true, name: true, slug: true }
+          },
+          match: {
+            include: {
+              canonicalProduct: {
+                include: {
+                  matches: {
+                    include: {
+                      product: {
+                        include: {
+                          store: { select: { name: true } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        orderBy: { name: 'asc' },
+        skip,
+        take: limitNum
+      }),
+      db.product.count({ where })
+    ])
+
+    const data = products.map(p => {
+      // Get other matches (excluding current product)
+      const otherMatches = p.match?.canonicalProduct?.matches
+        ?.filter(m => m.productId !== p.id)
+        ?.map(m => ({
+          id: m.product.id,
+          name: m.product.name,
+          storeName: m.product.store.name
+        })) || []
+
+      return {
+        id: p.id,
+        name: p.name,
+        normalizedName: p.normalizedName,
+        category: p.category,
+        brand: p.brand,
+        imageUrl: p.imageUrl,
+        storeId: p.store.id,
+        storeName: p.store.name,
+        hasMatch: !!p.match,
+        canonicalName: p.match?.canonicalProduct?.name || null,
+        otherMatches
+      }
+    })
+
+    res.json({
+      data,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    })
+  } catch (error) {
+    console.error('Error fetching products:', error)
+    res.status(500).json({ error: 'Failed to fetch products' })
+  }
+})
+
 // GET /api/products/unmatched - Products without ProductMatch
 productsRouter.get('/unmatched', async (req, res) => {
   try {
@@ -13,7 +112,8 @@ productsRouter.get('/unmatched', async (req, res) => {
     const skip = (pageNum - 1) * limitNum
 
     const where: Record<string, unknown> = {
-      match: null
+      match: null,
+      isHidden: false
     }
 
     if (storeId) {
@@ -99,6 +199,9 @@ productsRouter.get('/matched', async (req, res) => {
       ? Prisma.sql`AND cp.name ILIKE ${'%' + search + '%'}`
       : Prisma.empty
 
+    // Filter out hidden products
+    const hiddenCondition = Prisma.sql`AND p."isHidden" = false`
+
     // Get canonical products with store counts
     const canonicals = await db.$queryRaw<{
       id: string
@@ -119,6 +222,7 @@ productsRouter.get('/matched', async (req, res) => {
       WHERE 1=1
       ${categoryCondition}
       ${searchCondition}
+      ${hiddenCondition}
       GROUP BY cp.id
       HAVING COUNT(DISTINCT p."storeId") >= ${minStoresNum}
       ORDER BY "storeCount" DESC, cp.name
@@ -136,6 +240,7 @@ productsRouter.get('/matched', async (req, res) => {
         WHERE 1=1
         ${categoryCondition}
         ${searchCondition}
+        ${hiddenCondition}
         GROUP BY cp.id
         HAVING COUNT(DISTINCT p."storeId") >= ${minStoresNum}
       ) sub
@@ -146,7 +251,10 @@ productsRouter.get('/matched', async (req, res) => {
     const data = await Promise.all(
       canonicals.map(async (cp) => {
         const matches = await db.productMatch.findMany({
-          where: { canonicalProductId: cp.id },
+          where: {
+            canonicalProductId: cp.id,
+            product: { isHidden: false }
+          },
           include: {
             product: {
               include: {
@@ -211,6 +319,38 @@ productsRouter.get('/matched', async (req, res) => {
   } catch (error) {
     console.error('Error fetching matched products:', error)
     res.status(500).json({ error: 'Failed to fetch matched products' })
+  }
+})
+
+// PATCH /api/products/:productId - Update product fields (like category)
+productsRouter.patch('/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params
+    const { category } = req.body
+
+    const product = await db.product.findUnique({
+      where: { id: productId }
+    })
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' })
+    }
+
+    const updated = await db.product.update({
+      where: { id: productId },
+      data: { category }
+    })
+
+    res.json({
+      success: true,
+      product: {
+        id: updated.id,
+        category: updated.category
+      }
+    })
+  } catch (error) {
+    console.error('Error updating product:', error)
+    res.status(500).json({ error: 'Failed to update product' })
   }
 })
 

@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { formatPrice, formatDate, formatCategory, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -22,15 +23,41 @@ import {
   Store,
   Tag,
   Clock,
+  X,
 } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 export function Compare() {
   const { id } = useParams<{ id: string }>()
+  const queryClient = useQueryClient()
+  const [unmatchDialog, setUnmatchDialog] = useState<{
+    open: boolean
+    productId: string
+    productName: string
+    storeName: string
+  } | null>(null)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['compare', id],
     queryFn: () => api.getComparison(id!),
     enabled: !!id,
+  })
+
+  const unmatchMutation = useMutation({
+    mutationFn: (productId: string) => api.deleteMatch(productId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['compare', id] })
+      setUnmatchDialog(null)
+    },
   })
 
   if (isLoading) {
@@ -218,16 +245,33 @@ export function Compare() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {store.sourceUrl && (
-                        <a
-                          href={store.sourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline"
+                      <div className="flex items-center gap-2">
+                        {store.sourceUrl && (
+                          <a
+                            href={store.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() =>
+                            setUnmatchDialog({
+                              open: true,
+                              productId: store.productId,
+                              productName: store.productName,
+                              storeName: store.storeName,
+                            })
+                          }
                         >
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                      )}
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )
@@ -263,6 +307,40 @@ export function Compare() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Unmatch Confirmation Dialog */}
+      <AlertDialog
+        open={unmatchDialog?.open ?? false}
+        onOpenChange={(open) => !open && setUnmatchDialog(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Quitar producto del agrupamiento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vas a quitar <strong>{unmatchDialog?.productName}</strong> de{' '}
+              <strong>{unmatchDialog?.storeName}</strong> de este agrupamiento.
+              El producto aparecera en la lista de "Sin Match".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={unmatchMutation.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() =>
+                unmatchDialog && unmatchMutation.mutate(unmatchDialog.productId)
+              }
+              disabled={unmatchMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {unmatchMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Quitar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

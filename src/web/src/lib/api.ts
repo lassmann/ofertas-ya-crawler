@@ -135,12 +135,64 @@ export interface CanonicalSearchResult {
   similarity: number
 }
 
+export interface ProductListItem {
+  id: string
+  name: string
+  normalizedName: string
+  category: string | null
+  brand: string | null
+  imageUrl: string | null
+  storeId: string
+  storeName: string
+  hasMatch: boolean
+  canonicalName: string | null
+  otherMatches: {
+    id: string
+    name: string
+    storeName: string
+  }[]
+}
+
+export interface FeaturedOffer {
+  id: string
+  displayOrder: number
+  isActive: boolean
+  createdAt: string
+  canonicalProduct: {
+    id: string
+    name: string
+    category: string | null
+    brand: string | null
+    imageUrl: string | null
+  }
+  storeCount: number
+  minPrice: number | null
+  maxPrice: number | null
+  priceDifferencePercent: number
+}
+
 // API functions
 export const api = {
   // Stores
   getStores: () => fetchApi<Store[]>('/stores'),
 
   // Products
+  getAllProducts: (params: {
+    page?: number
+    limit?: number
+    storeId?: string
+    category?: string
+    search?: string
+  }) => {
+    const query = new URLSearchParams()
+    if (params.page) query.set('page', params.page.toString())
+    if (params.limit) query.set('limit', params.limit.toString())
+    if (params.storeId) query.set('storeId', params.storeId)
+    if (params.category) query.set('category', params.category)
+    if (params.search) query.set('search', params.search)
+    return fetchApi<PaginatedResponse<ProductListItem>>(`/products?${query}`)
+  },
+
   getUnmatchedProducts: (params: {
     page?: number
     limit?: number
@@ -177,6 +229,15 @@ export const api = {
 
   getCategories: () => fetchApi<string[]>('/products/categories'),
 
+  updateProductCategory: (productId: string, category: string) =>
+    fetchApi<{ success: boolean; product: { id: string; category: string } }>(
+      `/products/${productId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ category }),
+      }
+    ),
+
   // Compare
   getComparison: (canonicalId: string) =>
     fetchApi<CompareResponse>(`/compare/${canonicalId}`),
@@ -198,5 +259,44 @@ export const api = {
     fetchApi<{ success: boolean; canonical: { id: string; name: string } }>('/matches/canonical', {
       method: 'POST',
       body: JSON.stringify({ productId, name, category, brand }),
+    }),
+
+  deleteMatch: (productId: string, hide?: boolean) =>
+    fetchApi<{ success: boolean; productId: string; hidden: boolean }>(
+      `/matches/${productId}${hide ? '?hide=true' : ''}`,
+      { method: 'DELETE' }
+    ),
+
+  // Featured Offers
+  getFeaturedOffers: (includeInactive?: boolean) =>
+    fetchApi<FeaturedOffer[]>(`/featured${includeInactive ? '?includeInactive=true' : ''}`),
+
+  createFeaturedOffer: (canonicalProductId: string, displayOrder?: number) =>
+    fetchApi<{ success: boolean; featured: { id: string; canonicalProductId: string; displayOrder: number; isActive: boolean } }>(
+      '/featured',
+      {
+        method: 'POST',
+        body: JSON.stringify({ canonicalProductId, displayOrder }),
+      }
+    ),
+
+  updateFeaturedOffer: (id: string, data: { displayOrder?: number; isActive?: boolean }) =>
+    fetchApi<{ success: boolean; featured: { id: string; displayOrder: number; isActive: boolean } }>(
+      `/featured/${id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }
+    ),
+
+  reorderFeaturedOffers: (items: { id: string; displayOrder: number }[]) =>
+    fetchApi<{ success: boolean }>('/featured/reorder', {
+      method: 'PATCH',
+      body: JSON.stringify({ items }),
+    }),
+
+  deleteFeaturedOffer: (id: string) =>
+    fetchApi<{ success: boolean; id: string }>(`/featured/${id}`, {
+      method: 'DELETE',
     }),
 }

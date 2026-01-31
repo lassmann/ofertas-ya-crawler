@@ -12,16 +12,18 @@ Opciones:
   --product-id    ID del producto a remover de su match
   --canonical-id  ID del CanonicalProduct
   --store         Nombre de la tienda (usado con --canonical-id)
+  --hide          También marcar el producto como oculto (isHidden=true)
   --dry-run       Mostrar qué se eliminaría sin hacerlo
 
 Ejemplos:
   npm run unmatch -- --product-id=abc-123
+  npm run unmatch -- --product-id=abc-123 --hide
   npm run unmatch -- --canonical-id=xyz-789 --store=Biggie
   npm run unmatch -- --canonical-id=xyz-789 --store=Biggie --dry-run
 `)
 }
 
-async function unmatchByProductId(productId: string, dryRun: boolean) {
+async function unmatchByProductId(productId: string, dryRun: boolean, hide: boolean) {
   // Find the product match
   const match = await db.productMatch.findUnique({
     where: { productId },
@@ -45,6 +47,9 @@ async function unmatchByProductId(productId: string, dryRun: boolean) {
 
   if (dryRun) {
     logger.warn('[DRY RUN] Se eliminaría este match')
+    if (hide) {
+      logger.warn('[DRY RUN] El producto sería marcado como oculto')
+    }
     return true
   }
 
@@ -52,11 +57,19 @@ async function unmatchByProductId(productId: string, dryRun: boolean) {
     where: { id: match.id },
   })
 
-  logger.success(`✓ Match eliminado. El producto ahora está sin match.`)
+  if (hide) {
+    await db.product.update({
+      where: { id: productId },
+      data: { isHidden: true },
+    })
+    logger.success(`✓ Match eliminado y producto marcado como oculto.`)
+  } else {
+    logger.success(`✓ Match eliminado. El producto ahora está sin match.`)
+  }
   return true
 }
 
-async function unmatchByCanonicalAndStore(canonicalId: string, storeName: string, dryRun: boolean) {
+async function unmatchByCanonicalAndStore(canonicalId: string, storeName: string, dryRun: boolean, hide: boolean) {
   // Find the store
   const store = await db.store.findFirst({
     where: {
@@ -104,8 +117,13 @@ async function unmatchByCanonicalAndStore(canonicalId: string, storeName: string
 
   if (dryRun) {
     logger.warn(`[DRY RUN] Se eliminarían ${matches.length} match(es)`)
+    if (hide) {
+      logger.warn(`[DRY RUN] Los productos serían marcados como ocultos`)
+    }
     return true
   }
+
+  const productIds = matches.map(m => m.product.id)
 
   const deleted = await db.productMatch.deleteMany({
     where: {
@@ -113,7 +131,15 @@ async function unmatchByCanonicalAndStore(canonicalId: string, storeName: string
     },
   })
 
-  logger.success(`✓ ${deleted.count} match(es) eliminado(s). Los productos ahora están sin match.`)
+  if (hide) {
+    await db.product.updateMany({
+      where: { id: { in: productIds } },
+      data: { isHidden: true },
+    })
+    logger.success(`✓ ${deleted.count} match(es) eliminado(s) y productos marcados como ocultos.`)
+  } else {
+    logger.success(`✓ ${deleted.count} match(es) eliminado(s). Los productos ahora están sin match.`)
+  }
   return true
 }
 
@@ -129,17 +155,21 @@ async function main() {
   const canonicalId = args.find(a => a.startsWith('--canonical-id='))?.split('=')[1]
   const store = args.find(a => a.startsWith('--store='))?.split('=')[1]
   const dryRun = args.includes('--dry-run')
+  const hide = args.includes('--hide')
 
   if (dryRun) {
     logger.warn('Modo DRY RUN activado - no se realizarán cambios')
+  }
+  if (hide) {
+    logger.info('Modo HIDE activado - los productos serán marcados como ocultos')
   }
 
   let success = false
 
   if (productId) {
-    success = await unmatchByProductId(productId, dryRun)
+    success = await unmatchByProductId(productId, dryRun, hide)
   } else if (canonicalId && store) {
-    success = await unmatchByCanonicalAndStore(canonicalId, store, dryRun)
+    success = await unmatchByCanonicalAndStore(canonicalId, store, dryRun, hide)
   } else if (canonicalId && !store) {
     logger.error('Debes especificar --store cuando uses --canonical-id')
     printUsage()

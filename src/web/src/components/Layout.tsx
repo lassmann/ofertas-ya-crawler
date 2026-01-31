@@ -1,11 +1,13 @@
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Package, Link2, Search } from 'lucide-react'
+import { LayoutDashboard, Package, Link2, Search, ShoppingCart, Star } from 'lucide-react'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Productos', href: '/products', icon: ShoppingCart },
   { name: 'Sin Match', href: '/unmatched', icon: Package },
   { name: 'Con Match', href: '/matched', icon: Link2 },
+  { name: 'Destacados', href: '/admin/featured', icon: Star },
 ]
 
 interface LayoutProps {
@@ -53,7 +55,7 @@ export function Layout({ children }: LayoutProps) {
 
       {/* Mobile Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t">
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-5">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href
             return (

@@ -228,8 +228,10 @@ export function UnmatchedProducts() {
                       <Badge variant="outline">{product.store.name}</Badge>
                     </TableCell>
                     <TableCell>
-                      {product.category && (
+                      {product.category ? (
                         <Badge variant="secondary">{formatCategory(product.category)}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
