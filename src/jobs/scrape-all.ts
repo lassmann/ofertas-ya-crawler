@@ -6,6 +6,7 @@ import { CasaRicaScraper } from '../scrapers/supermercados/casarica.js'
 import { FortisScraper } from '../scrapers/supermercados/fortis.js'
 import { StockScraper } from '../scrapers/supermercados/stock.js'
 import { BiggieScraper } from '../scrapers/supermercados/biggie.js'
+import { AreteScraper } from '../scrapers/supermercados/arete.js'
 import type { ScrapedProduct, ScraperResult } from '../types/index.js'
 
 interface Scraper<T extends ScrapedProduct> {
@@ -51,6 +52,7 @@ async function main() {
     new FortisScraper(),
     new StockScraper(),
     new BiggieScraper(),
+    new AreteScraper(),
   ]
 
   // Run all scrapers in parallel

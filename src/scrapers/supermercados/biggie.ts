@@ -177,10 +177,14 @@ export class BiggieScraper {
     private parseApiResponse(items: BiggieApiProduct[]): BiggieProduct[] {
         return items.map(item => {
             // When isOnOffer is true:
-            // - price is the current (discounted) price
-            // - priceSaleOffer is the original price
-            const currentPrice = item.price
-            const oldPrice = item.isOnOffer && item.priceSaleOffer > 0 ? item.priceSaleOffer : undefined
+            // - price is the original price
+            // - priceSaleOffer is the discounted price
+            const currentPrice = item.isOnOffer && item.priceSaleOffer > 0
+                ? item.priceSaleOffer
+                : item.price
+            const oldPrice = item.isOnOffer && item.priceSaleOffer > 0
+                ? item.price
+                : undefined
 
             // Get first image (type=0 is full size)
             const imageUrl = item.images?.[0]?.src
