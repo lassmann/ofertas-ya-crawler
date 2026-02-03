@@ -1,10 +1,11 @@
 import { Router } from 'express'
 import { db } from '../../lib/db.js'
+import { requireAuth } from '../middleware/auth.js'
 
 export const canonicalRouter = Router()
 
 // PATCH /api/canonical/:id - Update canonical product (displayName)
-canonicalRouter.patch('/:id', async (req, res) => {
+canonicalRouter.patch('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params
     const { displayName } = req.body

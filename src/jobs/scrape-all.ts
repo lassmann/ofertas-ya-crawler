@@ -8,6 +8,7 @@ import { StockScraper } from '../scrapers/supermercados/stock.js'
 import { BiggieScraper } from '../scrapers/supermercados/biggie.js'
 import { AreteScraper } from '../scrapers/supermercados/arete.js'
 import { SalemmaScraper } from '../scrapers/supermercados/salemma.js'
+import { processAllProducts } from './process-matches.js'
 import type { ScrapedProduct, ScraperResult } from '../types/index.js'
 
 interface Scraper<T extends ScrapedProduct> {
@@ -114,6 +115,37 @@ async function main() {
     logger.success('')
     logger.success('✅ Todos los productos fueron scrapeados recientemente')
     logger.success('')
+  }
+
+  // Process product matches for new products
+  logger.box([
+    'PRODUCT MATCHING',
+    '',
+    'Processing new products...',
+  ].join('\n'))
+
+  await db.$executeRaw`CREATE EXTENSION IF NOT EXISTS pg_trgm`
+
+  const matchStartTime = Date.now()
+  const matchStats = await processAllProducts()
+  const matchDuration = Date.now() - matchStartTime
+
+  if (matchStats.total > 0) {
+    logger.box([
+      'MATCHING COMPLETED',
+      '',
+      `Total processed: ${matchStats.total}`,
+      `Barcode matches: ${matchStats.barcodeMatches}`,
+      `Alias matches: ${matchStats.aliasMatches}`,
+      `Fuzzy matches: ${matchStats.fuzzyMatches}`,
+      `New canonicals: ${matchStats.newCanonicals}`,
+      `Skipped (verified): ${matchStats.skipped}`,
+      `Errors: ${matchStats.errors}`,
+      '',
+      `Duration: ${(matchDuration / 1000).toFixed(1)}s`,
+    ].join('\n'))
+  } else {
+    logger.success('✅ No hay productos nuevos para procesar')
   }
 
   await db.$disconnect()

@@ -7,7 +7,7 @@ const FUZZY_THRESHOLD = 0.4 // pg_trgm default threshold
 const HIGH_CONFIDENCE_THRESHOLD = 0.85
 const BASE_NAME_SIMILARITY_THRESHOLD = 0.7 // Lower threshold for base names (without measurements)
 
-interface MatchStats {
+export interface MatchStats {
   total: number
   barcodeMatches: number
   aliasMatches: number
@@ -326,7 +326,7 @@ async function processProduct(product: Product, stats: MatchStats): Promise<void
 /**
  * Procesa todos los productos sin match o con match desactualizado
  */
-async function processAllProducts(): Promise<MatchStats> {
+export async function processAllProducts(): Promise<MatchStats> {
   const stats: MatchStats = {
     total: 0,
     barcodeMatches: 0,
@@ -377,7 +377,7 @@ async function processAllProducts(): Promise<MatchStats> {
 /**
  * Muestra estadísticas del sistema de matching
  */
-async function showStats(): Promise<void> {
+export async function showStats(): Promise<void> {
   const [
     totalProducts,
     totalMatches,

@@ -239,3 +239,15 @@ model FeaturedOffer {
 
   @@index([isActive, displayOrder])
 }
+
+// === AUTHENTICATION ===
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   // bcrypt hash
+  name      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

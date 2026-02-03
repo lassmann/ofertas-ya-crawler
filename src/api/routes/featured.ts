@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { db } from '../../lib/db.js'
+import { requireAuth } from '../middleware/auth.js'
 
 export const featuredRouter = Router()
 
@@ -86,7 +87,7 @@ featuredRouter.get('/', async (req, res) => {
 })
 
 // POST /api/featured - Create a featured offer
-featuredRouter.post('/', async (req, res) => {
+featuredRouter.post('/', requireAuth, async (req, res) => {
   try {
     const { canonicalProductId, displayOrder } = req.body
 
@@ -144,7 +145,7 @@ featuredRouter.post('/', async (req, res) => {
 })
 
 // PATCH /api/featured/:id - Update a featured offer
-featuredRouter.patch('/:id', async (req, res) => {
+featuredRouter.patch('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params
     const { displayOrder, isActive } = req.body
@@ -180,7 +181,7 @@ featuredRouter.patch('/:id', async (req, res) => {
 })
 
 // PATCH /api/featured/reorder - Reorder multiple featured offers
-featuredRouter.patch('/reorder', async (req, res) => {
+featuredRouter.patch('/reorder', requireAuth, async (req, res) => {
   try {
     const { items } = req.body
 
@@ -206,7 +207,7 @@ featuredRouter.patch('/reorder', async (req, res) => {
 })
 
 // DELETE /api/featured/:id - Delete a featured offer
-featuredRouter.delete('/:id', async (req, res) => {
+featuredRouter.delete('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params
 

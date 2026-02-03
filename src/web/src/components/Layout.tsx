@@ -1,6 +1,8 @@
-import { Link, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Package, Link2, Search, ShoppingCart, Star } from 'lucide-react'
+import { auth, api } from '@/lib/api'
+import { LayoutDashboard, Package, Link2, Search, ShoppingCart, Star, LogIn, LogOut } from 'lucide-react'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -16,6 +18,18 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation()
+  const navigate = useNavigate()
+  const [isLoggedIn, setIsLoggedIn] = useState(auth.isAuthenticated())
+
+  useEffect(() => {
+    setIsLoggedIn(auth.isAuthenticated())
+  }, [location])
+
+  const handleLogout = () => {
+    api.logout()
+    setIsLoggedIn(false)
+    navigate('/')
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -49,6 +63,24 @@ export function Layout({ children }: LayoutProps) {
                 })}
               </nav>
             </div>
+            {/* Auth button */}
+            {isLoggedIn ? (
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="hidden md:inline">Salir</span>
+              </button>
+            ) : (
+              <Link
+                to="/login"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+              >
+                <LogIn className="h-4 w-4" />
+                <span className="hidden md:inline">Ingresar</span>
+              </Link>
+            )}
           </div>
         </div>
       </header>

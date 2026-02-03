@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { Prisma } from '../../../generated/prisma/client.js'
 import { db } from '../../lib/db.js'
+import { requireAuth } from '../middleware/auth.js'
 
 export const productsRouter = Router()
 
@@ -323,7 +324,7 @@ productsRouter.get('/matched', async (req, res) => {
 })
 
 // PATCH /api/products/:productId - Update product fields (like category)
-productsRouter.patch('/:productId', async (req, res) => {
+productsRouter.patch('/:productId', requireAuth, async (req, res) => {
   try {
     const { productId } = req.params
     const { category } = req.body
