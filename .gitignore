@@ -60,4 +60,4 @@ backups/
 *.tsbuildinfo
 
 # Frontend project (temporary - will be moved to its own repo)
-ofertas-ya-ui/
+ofertas-ya-ui/backup.sqlOC

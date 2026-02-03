@@ -93,6 +93,25 @@ npm run db:generate
 npm run db:seed
 ```
 
+### 10.1. Configurar JWT Secret
+
+Generar un secret seguro:
+
+```bash
+openssl rand -base64 32
+```
+
+Agregar al `.env`:
+```
+JWT_SECRET="el-secret-generado"
+```
+
+### 10.2. Crear usuario administrador
+
+```bash
+npm run db:create-user admin@tudominio.com tu-password-seguro
+```
+
 ### 11. (Opcional) Restaurar backup desde desarrollo
 
 Si tenés un backup de tu BD local:
@@ -143,6 +162,21 @@ pm2 list
 
 # Ver proxima ejecucion del scraper
 pm2 describe ofertas-ya-scraper
+```
+
+### Verificar autenticacion
+
+```bash
+# Obtener token
+curl -X POST http://localhost:3001/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@tudominio.com","password":"tu-password-seguro"}'
+
+# Usar token en requests protegidos
+curl -X POST http://localhost:3001/api/featured \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"canonicalProductId":"xxx"}'
 ```
 
 ## Firewall (UFW)

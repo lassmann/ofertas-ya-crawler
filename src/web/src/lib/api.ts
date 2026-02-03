@@ -1,16 +1,43 @@
 const API_BASE = '/api'
+const TOKEN_KEY = 'auth_token'
+
+// Auth helpers
+export const auth = {
+  getToken: () => localStorage.getItem(TOKEN_KEY),
+  setToken: (token: string) => localStorage.setItem(TOKEN_KEY, token),
+  removeToken: () => localStorage.removeItem(TOKEN_KEY),
+  isAuthenticated: () => !!localStorage.getItem(TOKEN_KEY),
+  isTokenExpired: () => {
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (!token) return true
+
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      return payload.exp * 1000 < Date.now()
+    } catch {
+      return true
+    }
+  },
+}
 
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const token = auth.getToken()
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
       ...options?.headers,
     },
   })
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: 'Request failed' }))
+    // If 401 and not on login endpoint, clear token and redirect
+    if (res.status === 401 && !endpoint.includes('/auth/login')) {
+      auth.removeToken()
+      window.location.href = '/login'
+    }
     throw new Error(error.error || 'Request failed')
   }
 
@@ -180,8 +207,32 @@ export interface FeaturedOffer {
   priceDifferencePercent: number
 }
 
+// Auth types
+export interface LoginResponse {
+  token: string
+  user: {
+    id: string
+    email: string
+    name: string | null
+  }
+}
+
 // API functions
 export const api = {
+  // Auth
+  login: async (email: string, password: string): Promise<LoginResponse> => {
+    const response = await fetchApi<LoginResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    })
+    auth.setToken(response.token)
+    return response
+  },
+
+  logout: () => {
+    auth.removeToken()
+  },
+
   // Stores
   getStores: () => fetchApi<Store[]>('/stores'),
 
