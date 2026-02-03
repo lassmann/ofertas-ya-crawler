@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/jobs/scrape-all.ts",
     "dev:api": "tsx watch src/api/server.ts",
+    "start:api": "tsx src/api/server.ts",
     "dev:web": "vite --config src/web/vite.config.ts",
     "dev:full": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
     "build:web": "vite build --config src/web/vite.config.ts",
@@ -34,6 +35,7 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed.ts",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "stats": "tsx src/scripts/stats.ts",

@@ -11,6 +11,7 @@ out
 .env
 .env.local
 .env.*.local
+.claude
 
 # Prisma
 /generated/prisma
@@ -45,6 +46,10 @@ tmp
 temp
 *.tmp
 *.temp
+
+# Backups
+backups/
+*.sql
 
 # Cache
 .cache
