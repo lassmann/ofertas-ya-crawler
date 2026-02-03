@@ -1,5 +1,58 @@
+# Dependencies
 node_modules
-# Keep environment variables out of version control
-.env
+.pnpm-store
+
+# Build output
 dist
+build
+out
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Prisma
 /generated/prisma
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage
+.nyc_output
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temp files
+tmp
+temp
+*.tmp
+*.temp
+
+# Cache
+.cache
+.parcel-cache
+.turbo
+.eslintcache
+.prettiercache
+*.tsbuildinfo
+
+# Frontend project (temporary - will be moved to its own repo)
+ofertas-ya-ui/

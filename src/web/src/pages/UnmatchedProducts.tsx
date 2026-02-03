@@ -351,6 +351,7 @@ export function UnmatchedProducts() {
                         <p className="font-medium text-sm">{result.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {formatCategory(result.category || '')} - Similitud: {Math.round(result.similarity * 100)}%
+                          {result.minPrice && ` - Desde ${formatPrice(result.minPrice)}`}
                         </p>
                       </button>
                     ))}

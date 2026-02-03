@@ -93,6 +93,80 @@ curl -X POST http://localhost:3001/api/matches/canonical \
 curl http://localhost:3001/api/compare/987fcdeb-51a2-3bc4-d567-890123456789
 ```
 
+### Health check
+
+```bash
+curl http://localhost:3001/api/health
+```
+
+### Listar ofertas destacadas
+
+```bash
+# Solo ofertas activas
+curl http://localhost:3001/api/featured
+
+# Incluir ofertas inactivas (para admin)
+curl "http://localhost:3001/api/featured?includeInactive=true"
+```
+
+### Crear oferta destacada
+
+```bash
+curl -X POST http://localhost:3001/api/featured \
+  -H "Content-Type: application/json" \
+  -d '{
+    "canonicalProductId": "uuid-del-producto-canonico"
+  }'
+```
+
+### Actualizar oferta destacada
+
+```bash
+# Desactivar una oferta
+curl -X PATCH http://localhost:3001/api/featured/uuid-de-la-oferta \
+  -H "Content-Type: application/json" \
+  -d '{
+    "isActive": false
+  }'
+
+# Cambiar orden
+curl -X PATCH http://localhost:3001/api/featured/uuid-de-la-oferta \
+  -H "Content-Type: application/json" \
+  -d '{
+    "displayOrder": 5
+  }'
+```
+
+### Reordenar ofertas destacadas
+
+```bash
+curl -X PATCH http://localhost:3001/api/featured/reorder \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [
+      { "id": "uuid-1", "displayOrder": 0 },
+      { "id": "uuid-2", "displayOrder": 1 },
+      { "id": "uuid-3", "displayOrder": 2 }
+    ]
+  }'
+```
+
+### Eliminar oferta destacada
+
+```bash
+curl -X DELETE http://localhost:3001/api/featured/uuid-de-la-oferta
+```
+
+### Actualizar nombre de producto canonico
+
+```bash
+curl -X PATCH http://localhost:3001/api/canonical/uuid-del-canonico \
+  -H "Content-Type: application/json" \
+  -d '{
+    "displayName": "Coca-Cola Original 2 Litros"
+  }'
+```
+
 ---
 
 ## Usando JavaScript/TypeScript
@@ -226,6 +300,59 @@ const comparison = await comparePrices('canonical-uuid')
 console.log(`${comparison.canonical.name}:`)
 console.log(`  Mas barato: ${comparison.cheapest?.storeName} - ₲${comparison.cheapest?.price}`)
 console.log(`  Diferencia: ${comparison.priceDifferencePercent}%`)
+```
+
+### Gestionar ofertas destacadas
+
+```typescript
+interface FeaturedOffer {
+  id: string
+  displayOrder: number
+  isActive: boolean
+  canonicalProduct: {
+    id: string
+    name: string
+    category: string | null
+    imageUrl: string | null
+  }
+  storeCount: number
+  minPrice: number | null
+  maxPrice: number | null
+  priceDifferencePercent: number
+}
+
+async function getFeaturedOffers(includeInactive = false): Promise<FeaturedOffer[]> {
+  const params = includeInactive ? '?includeInactive=true' : ''
+  return apiRequest(`/featured${params}`)
+}
+
+async function createFeaturedOffer(canonicalProductId: string) {
+  return apiRequest('/featured', {
+    method: 'POST',
+    body: JSON.stringify({ canonicalProductId }),
+  })
+}
+
+async function deleteFeaturedOffer(id: string) {
+  return apiRequest(`/featured/${id}`, { method: 'DELETE' })
+}
+
+async function toggleFeaturedActive(id: string, isActive: boolean) {
+  return apiRequest(`/featured/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isActive }),
+  })
+}
+
+// Uso
+const featured = await getFeaturedOffers()
+console.log(`${featured.length} ofertas destacadas`)
+
+// Agregar nueva oferta
+await createFeaturedOffer('canonical-product-uuid')
+
+// Desactivar oferta
+await toggleFeaturedActive('featured-uuid', false)
 ```
 
 ---

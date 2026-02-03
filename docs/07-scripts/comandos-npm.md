@@ -76,6 +76,22 @@ npm run scrape:superseis -- --route=bebidas --save
 | `npm run scrape:salemma:save` | Todas las categorias + guardar en DB |
 | `npm run scrape:salemma:ofertas:save` | Solo ofertas + guardar en DB |
 
+### Arete
+
+| Comando | Descripcion |
+|---------|-------------|
+| `npm run scrape:arete` | Dry run (todas las categorias) |
+| `npm run scrape:arete:ofertas` | Solo ofertas/descuentos (dry run) |
+| `npm run scrape:arete:save` | Todas las categorias + guardar en DB |
+| `npm run scrape:arete:ofertas:save` | Solo ofertas + guardar en DB |
+
+**Opciones adicionales:**
+```bash
+# Categoria especifica
+npm run scrape:arete -- --route=lacteos
+npm run scrape:arete -- --route=bebidas --save
+```
+
 ## Base de Datos
 
 | Comando | Descripcion |
@@ -147,6 +163,7 @@ npm run match:stats
 # Solo ofertas de todos los supermercados que lo soporten
 npm run scrape:superseis:ofertas:save
 npm run scrape:salemma:ofertas:save
+npm run scrape:arete:ofertas:save
 ```
 
 ### Debug de matching

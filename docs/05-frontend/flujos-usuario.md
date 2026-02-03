@@ -146,6 +146,63 @@ flowchart TD
 
 ---
 
+## Flujo 5: Administrar Ofertas Destacadas
+
+```mermaid
+flowchart TD
+    A[Ir a /admin/featured] --> B[Ver lista de ofertas destacadas]
+    B --> C{Accion?}
+
+    C -->|Agregar| D[Click en Agregar]
+    D --> E[Buscar producto canonico]
+    E --> F[Seleccionar producto]
+    F --> G[POST /api/featured]
+    G --> H[Producto agregado a lista]
+
+    C -->|Reordenar| I[Click flechas arriba/abajo]
+    I --> J[PATCH /api/featured/:id]
+    J --> K[Orden actualizado]
+
+    C -->|Activar/Desactivar| L[Click icono ojo]
+    L --> M[PATCH /api/featured/:id]
+    M --> N[Estado actualizado]
+
+    C -->|Eliminar| O[Click icono basura]
+    O --> P[Confirmar eliminacion]
+    P --> Q[DELETE /api/featured/:id]
+    Q --> R[Producto eliminado de lista]
+```
+
+**Pasos detallados:**
+
+1. **Navegar a admin de ofertas destacadas**
+   - Click en "Ofertas Destacadas" en menu admin
+   - Se carga lista desde `/api/featured?includeInactive=true`
+
+2. **Agregar nueva oferta**
+   - Click en boton "Agregar"
+   - Buscar producto canonico por nombre
+   - Solo aparecen productos que ya tienen match
+   - Click en "+" para agregar
+   - Producto aparece al final de la lista
+
+3. **Reordenar ofertas**
+   - Usar flechas arriba/abajo
+   - Orden se guarda automaticamente
+   - Afecta como aparecen en la pagina principal
+
+4. **Activar/Desactivar oferta**
+   - Click en icono de ojo
+   - Oferta desactivada no aparece en pagina principal
+   - Util para pausar temporalmente sin eliminar
+
+5. **Eliminar oferta**
+   - Click en icono de basura
+   - Confirmar en dialogo
+   - Producto ya no aparece como destacado
+
+---
+
 ## Componentes de UI por Flujo
 
 ### Dashboard
@@ -225,5 +282,44 @@ flowchart TD
 │ └─────────────────────────────────────────┘│
 │                                             │
 │ Ahorro maximo: ₲3.500 (24%) vs Biggie      │
+└─────────────────────────────────────────────┘
+```
+
+### Admin Ofertas Destacadas
+```
+┌─────────────────────────────────────────────┐
+│ ⭐ Ofertas Destacadas            [+ Agregar]│
+├─────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────┐│
+│ │ [▲][▼] [img] Coca-Cola 2L              ││
+│ │        Bebidas │ 5 tiendas │ ₲14.500   ││
+│ │                           [👁] [🗑]    ││
+│ └─────────────────────────────────────────┘│
+│ ┌─────────────────────────────────────────┐│
+│ │ [▲][▼] [img] Yerba Mate 1kg            ││
+│ │        Almacen │ 4 tiendas │ ₲28.000   ││
+│ │                           [👁] [🗑]    ││
+│ └─────────────────────────────────────────┘│
+└─────────────────────────────────────────────┘
+```
+
+### Agregar Oferta Dialog
+```
+┌─────────────────────────────────────────────┐
+│ Agregar Oferta Destacada               [X] │
+├─────────────────────────────────────────────┤
+│ Busca productos que ya tengan match         │
+│                                             │
+│ Search: [coca cola_______________]          │
+│                                             │
+│ Resultados:                                 │
+│ ┌─────────────────────────────────────────┐│
+│ │ Coca-Cola Original 2L                [+]││
+│ │ Bebidas                                 ││
+│ └─────────────────────────────────────────┘│
+│ ┌─────────────────────────────────────────┐│
+│ │ Coca-Cola Zero 2L                    [+]││
+│ │ Bebidas                                 ││
+│ └─────────────────────────────────────────┘│
 └─────────────────────────────────────────────┘
 ```

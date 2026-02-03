@@ -2,18 +2,21 @@ import * as cheerio from 'cheerio'
 import { casaricaConfig, type CasaRicaRouteKey } from '../config/casarica'
 import { db } from '../../lib/db'
 import { scraperLog, logger } from '../../lib/logger'
-import { parseProductName } from '../../lib/matching/fuzzy-matcher'
-import type { ScrapedProduct, ScraperResult } from '../../types/index'
+import type { ScraperResult } from '../../types/index'
+import {
+    BaseScraper,
+    BaseProduct,
+    PageResult,
+    parseCliArgs,
+    showCliHeader,
+    showCliSummary,
+    saveIfRequested,
+} from '../base'
 
-interface CasaRicaProduct extends ScrapedProduct {
-    category: string
-}
+interface CasaRicaProduct extends BaseProduct {}
 
-export class CasaRicaScraper {
-    private config = casaricaConfig
-
-    get name() { return this.config.name }
-    get slug() { return this.config.slug }
+export class CasaRicaScraper extends BaseScraper<CasaRicaProduct, typeof casaricaConfig, CasaRicaRouteKey> {
+    protected config = casaricaConfig
 
     async scrapeRoute(routeKey: CasaRicaRouteKey): Promise<ScraperResult<CasaRicaProduct>> {
         const startTime = Date.now()
@@ -30,16 +33,16 @@ export class CasaRicaScraper {
                 logger.debug(`[${this.name}] URL: ${url}`)
 
                 try {
-                    const { products, nextPageExists } = await this.scrapePage(url, route.category)
+                    const html = await this.fetchPage(url)
+                    const { products, nextPageExists } = this.parseHtml(html, url, route.category)
                     allProducts.push(...products)
 
                     scraperLog.page(this.name, route.category, pageNum, products.length)
 
-                    // If no products found, stop pagination
                     if (products.length === 0) {
                         hasMorePages = false
                     } else {
-                        hasMorePages = nextPageExists
+                        hasMorePages = nextPageExists ?? false
                         pageNum++
                     }
 
@@ -62,86 +65,10 @@ export class CasaRicaScraper {
             scraperLog.error(this.name, msg)
         }
 
-        return {
-            success: errors.length === 0,
-            data: allProducts,
-            errors,
-            scrapedAt: new Date(),
-            duration: Date.now() - startTime,
-        }
+        return this.createResult(allProducts, errors, startTime)
     }
 
-    async scrapeAll(options?: {
-        onlyCategories?: CasaRicaRouteKey[]
-    }): Promise<ScraperResult<CasaRicaProduct>> {
-        const startTime = Date.now()
-        const allProducts: CasaRicaProduct[] = []
-        const allErrors: string[] = []
-
-        const routeKeys = options?.onlyCategories ||
-            (Object.keys(this.config.routes) as CasaRicaRouteKey[])
-
-        const BATCH_SIZE = 3
-        const BATCH_DELAY_MS = 500
-
-        scraperLog.start(this.name, routeKeys.length)
-        logger.info(`[${this.name}] Mode: ${BATCH_SIZE} in parallel, ${BATCH_DELAY_MS}ms between batches`)
-
-        // Process in batches of 3
-        for (let i = 0; i < routeKeys.length; i += BATCH_SIZE) {
-            const batch = routeKeys.slice(i, i + BATCH_SIZE)
-            const batchNum = Math.floor(i / BATCH_SIZE) + 1
-            const totalBatches = Math.ceil(routeKeys.length / BATCH_SIZE)
-
-            scraperLog.batch(this.name, batchNum, totalBatches, batch)
-
-            // Execute batch in parallel
-            const results = await Promise.all(
-                batch.map(routeKey => this.scrapeRoute(routeKey))
-            )
-
-            // Add results
-            for (let j = 0; j < results.length; j++) {
-                const result = results[j]
-                const routeKey = batch[j]
-                allProducts.push(...result.data)
-                allErrors.push(...result.errors)
-                scraperLog.route(this.name, routeKey, result.data.length)
-            }
-
-            // Delay between batches (except the last one)
-            if (i + BATCH_SIZE < routeKeys.length) {
-                await this.delay(BATCH_DELAY_MS)
-            }
-        }
-
-        return {
-            success: allErrors.length === 0,
-            data: allProducts,
-            errors: allErrors,
-            scrapedAt: new Date(),
-            duration: Date.now() - startTime,
-        }
-    }
-
-    async scrapePage(url: string, category: string): Promise<{ products: CasaRicaProduct[]; nextPageExists: boolean }> {
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'es-ES,es;q=0.9',
-            },
-        })
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-        }
-
-        const html = await response.text()
-        return this.parseHtml(html, url, category)
-    }
-
-    parseHtml(html: string, sourceUrl: string, category: string): { products: CasaRicaProduct[]; nextPageExists: boolean } {
+    parseHtml(html: string, sourceUrl: string, category: string): PageResult<CasaRicaProduct> {
         const $ = cheerio.load(html)
         const products: CasaRicaProduct[] = []
         const { selectors, parsePrice, extractExternalId, extractBarcode } = this.config
@@ -149,26 +76,20 @@ export class CasaRicaScraper {
         $(selectors.productContainer).each((_, element) => {
             const $el = $(element)
 
-            // Extract name
             const name = $el.find(selectors.name).text().trim()
 
-            // Product container IS the <a> link, so URL comes from $el.attr('href')
             const productUrl = $el.attr('href')
             const fullUrl = productUrl
                 ? (productUrl.startsWith('http') ? productUrl : `${this.config.baseUrl}/${productUrl}`)
                 : sourceUrl
 
-            // Extract external ID from URL (e.g., "bebida-alpro-p12173" -> "12173")
             const externalId = extractExternalId(productUrl) || undefined
 
-            // Extract image URL - try data-src first (lazy loading), fallback to src
             const $img = $el.find(selectors.image)
             const imageUrl = $img.attr('data-src') || $img.attr('src')
 
-            // Extract barcode from image URL (e.g., ".../5411188110835.jpg" -> "5411188110835")
             const barcode = extractBarcode(imageUrl) || undefined
 
-            // Extract price - get non-empty span.amount (skip empty ones inside <ins>)
             const priceContainer = $el.find(selectors.priceContainer)
             let priceText = ''
             priceContainer.find(selectors.regularPrice).each((_, priceEl) => {
@@ -181,7 +102,7 @@ export class CasaRicaScraper {
 
             if (!name || !price) return
 
-            const product: CasaRicaProduct = {
+            products.push({
                 name,
                 price,
                 imageUrl: imageUrl || undefined,
@@ -189,206 +110,32 @@ export class CasaRicaScraper {
                 category,
                 externalId,
                 barcode,
-            }
-
-            products.push(product)
+            })
         })
 
-        // Check if next page exists using a.next.page-numbers selector
         const nextPageExists = $(selectors.nextPage).length > 0
 
         return { products, nextPageExists }
-    }
-
-    async saveProducts(products: CasaRicaProduct[]): Promise<{ saved: number; updated: number }> {
-        const store = await db.store.upsert({
-            where: { slug: this.slug },
-            update: { lastScrapedAt: new Date() },
-            create: {
-                name: this.name,
-                slug: this.slug,
-                type: 'SUPERMERCADO',
-                websiteUrl: this.config.baseUrl,
-                isActive: true,
-            },
-        })
-
-        let saved = 0
-        let updated = 0
-        const seen = new Set<string>()
-
-        for (const product of products) {
-            const normalizedName = this.normalizeName(product.name)
-            const parsed = parseProductName(normalizedName)
-
-            if (seen.has(normalizedName)) continue
-            seen.add(normalizedName)
-
-            try {
-                let dbProduct
-
-                // First, try to find by externalId if available (more reliable identifier)
-                if (product.externalId) {
-                    const existingByExternalId = await db.product.findFirst({
-                        where: {
-                            storeId: store.id,
-                            externalId: product.externalId,
-                        },
-                    })
-
-                    if (existingByExternalId) {
-                        // Update existing product found by externalId
-                        dbProduct = await db.product.update({
-                            where: { id: existingByExternalId.id },
-                            data: {
-                                name: product.name,
-                                normalizedName,
-                                baseNormalizedName: parsed.baseName,
-                                quantity: parsed.quantity,
-                                unit: parsed.unit,
-                                imageUrl: product.imageUrl,
-                                category: product.category,
-                                barcode: product.barcode,
-                                updatedAt: new Date(),
-                            },
-                        })
-                        updated++
-                    }
-                }
-
-                // If not found by externalId, upsert by normalizedName
-                if (!dbProduct) {
-                    const existing = await db.product.findUnique({
-                        where: {
-                            storeId_normalizedName: {
-                                storeId: store.id,
-                                normalizedName,
-                            },
-                        },
-                    })
-
-                    dbProduct = await db.product.upsert({
-                        where: {
-                            storeId_normalizedName: {
-                                storeId: store.id,
-                                normalizedName,
-                            },
-                        },
-                        update: {
-                            name: product.name,
-                            baseNormalizedName: parsed.baseName,
-                            quantity: parsed.quantity,
-                            unit: parsed.unit,
-                            imageUrl: product.imageUrl,
-                            category: product.category,
-                            barcode: product.barcode,
-                            externalId: product.externalId,
-                            updatedAt: new Date(),
-                        },
-                        create: {
-                            name: product.name,
-                            normalizedName,
-                            baseNormalizedName: parsed.baseName,
-                            quantity: parsed.quantity,
-                            unit: parsed.unit,
-                            imageUrl: product.imageUrl,
-                            category: product.category,
-                            barcode: product.barcode,
-                            externalId: product.externalId,
-                            storeId: store.id,
-                        },
-                    })
-
-                    if (existing) {
-                        updated++
-                    } else {
-                        saved++
-                    }
-                }
-
-                await db.price.create({
-                    data: {
-                        price: product.price,
-                        sourceUrl: product.sourceUrl,
-                        productId: dbProduct.id,
-                        storeId: store.id,
-                    },
-                })
-
-            } catch (error) {
-                logger.error(`Error saving "${product.name}":`, error)
-            }
-        }
-
-        return { saved, updated }
-    }
-
-    private normalizeName(name: string): string {
-        return name
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z0-9\s]/g, '')
-            .replace(/\s+/g, ' ')
-            .trim()
-    }
-
-    private delay(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms))
     }
 }
 
 // CLI
 const isMainModule = import.meta.url === `file://${process.argv[1]}`
 if (isMainModule) {
-    const args = process.argv.slice(2)
+    const args = parseCliArgs(process.argv.slice(2))
     const scraper = new CasaRicaScraper()
 
-    const saveToDb = args.includes('--save')
-    const specificRoute = args.find(a => a.startsWith('--route='))?.split('=')[1] as CasaRicaRouteKey | undefined
-
-    logger.box([
-        `🛒 Casa Rica Scraper`,
-        ``,
-        `   Mode: ${specificRoute ? `Route: ${specificRoute}` : 'All categories'}`,
-        `   Save: ${saveToDb ? 'Yes' : 'No (use --save to save)'}`,
-    ].join('\n'))
+    showCliHeader('Casa Rica', args)
 
     let result: ScraperResult<CasaRicaProduct>
 
-    if (specificRoute) {
-        result = await scraper.scrapeRoute(specificRoute)
+    if (args.specificRoute) {
+        result = await scraper.scrapeRoute(args.specificRoute as CasaRicaRouteKey)
     } else {
         result = await scraper.scrapeAll()
     }
 
-    // Final summary
-    scraperLog.summary(scraper.name, {
-        total: result.data.length,
-        errors: result.errors.length,
-        duration: result.duration,
-    })
-
-    if (result.data.length > 0) {
-        logger.info('Examples:')
-        result.data.slice(0, 3).forEach(p => {
-            logger.log(`  ${p.name}: ₲ ${p.price.toLocaleString()}`)
-        })
-    }
-
-    // Summary by category
-    const byCategory = result.data.reduce((acc, p) => {
-        acc[p.category] = (acc[p.category] || 0) + 1
-        return acc
-    }, {} as Record<string, number>)
-
-    scraperLog.categories(scraper.name, byCategory)
-
-    if (saveToDb && result.data.length > 0) {
-        logger.start('Guardando en base de datos...')
-        const { saved, updated } = await scraper.saveProducts(result.data)
-        scraperLog.saved(scraper.name, saved, updated)
-    }
-
+    showCliSummary(scraper.name, result)
+    await saveIfRequested(scraper, result.data, args.saveToDb)
     await db.$disconnect()
 }

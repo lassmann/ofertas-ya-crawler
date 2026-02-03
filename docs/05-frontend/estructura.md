@@ -28,6 +28,8 @@ src/web/
 │   │   ├── Dashboard.tsx
 │   │   ├── UnmatchedProducts.tsx
 │   │   ├── MatchedProducts.tsx
+│   │   ├── Products.tsx
+│   │   ├── AdminFeatured.tsx
 │   │   └── Compare.tsx
 │   ├── App.tsx          # Componente raiz + rutas
 │   ├── main.tsx         # Entry point
@@ -70,6 +72,24 @@ Comparacion de precios de un producto especifico:
 - Indicador del mas barato
 - Descuentos actuales
 - Links a fuente original
+
+### Products (`/products`)
+
+Pagina de busqueda de todos los productos:
+- Busqueda por nombre
+- Filtros por tienda y categoria
+- Muestra estado de match de cada producto
+- Expandible para ver matches en otras tiendas
+- Paginacion
+
+### AdminFeatured (`/admin/featured`)
+
+Administracion de ofertas destacadas:
+- Lista de productos destacados con orden
+- Agregar nuevos productos (busqueda de canonicos)
+- Reordenar con flechas arriba/abajo
+- Activar/desactivar ofertas
+- Eliminar ofertas
 
 ## Cliente API
 
@@ -119,6 +139,34 @@ export const api = {
   // Compare
   getComparison: (canonicalId) =>
     fetch(`${API_BASE}/compare/${canonicalId}`).then(r => r.json()),
+
+  // Featured offers
+  getFeaturedOffers: (includeInactive = false) =>
+    fetch(`${API_BASE}/featured${includeInactive ? '?includeInactive=true' : ''}`)
+      .then(r => r.json()),
+
+  createFeaturedOffer: (canonicalProductId) =>
+    fetch(`${API_BASE}/featured`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ canonicalProductId }),
+    }).then(r => r.json()),
+
+  updateFeaturedOffer: (id, data) =>
+    fetch(`${API_BASE}/featured/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then(r => r.json()),
+
+  deleteFeaturedOffer: (id) =>
+    fetch(`${API_BASE}/featured/${id}`, { method: 'DELETE' })
+      .then(r => r.json()),
+
+  // All products
+  getAllProducts: (params) =>
+    fetch(`${API_BASE}/products?${new URLSearchParams(params)}`)
+      .then(r => r.json()),
 }
 ```
 

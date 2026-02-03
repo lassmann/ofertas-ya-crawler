@@ -10,7 +10,6 @@ export const salemmaConfig = {
         ofertasAlmacen: { path: '/ofertas/almacen', category: Category.OFERTAS },
         ofertasBebidasConAlcohol: { path: '/ofertas/bebidas-c-alcohol', category: Category.OFERTAS },
         ofertasBebidasSinAlcohol: { path: '/ofertas/bebidas-s-alcohol', category: Category.OFERTAS },
-        ofertasConfiteria: { path: '/ofertas/confiteria', category: Category.OFERTAS },
         ofertasCongelados: { path: '/ofertas/congelados', category: Category.OFERTAS },
         ofertasDieteticos: { path: '/ofertas/dieteticos', category: Category.OFERTAS },
         ofertasEmbutidos: { path: '/ofertas/embutidos', category: Category.OFERTAS },

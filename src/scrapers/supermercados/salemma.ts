@@ -2,19 +2,24 @@ import * as cheerio from 'cheerio'
 import { salemmaConfig, type SalemmaRouteKey } from '../config/salemma'
 import { db } from '../../lib/db'
 import { scraperLog, logger } from '../../lib/logger'
-import { parseProductName } from '../../lib/matching/fuzzy-matcher'
-import type { ScrapedProduct, ScraperResult } from '../../types/index'
+import type { ScraperResult } from '../../types/index'
+import {
+    BaseScraper,
+    BaseProduct,
+    PageResult,
+    parseCliArgs,
+    showCliHeader,
+    showCliSummary,
+    saveIfRequested,
+} from '../base'
 
-interface SalemmaProduct extends ScrapedProduct {
-    category: string
+interface SalemmaProduct extends BaseProduct {
+    discountPercent?: number
 }
 
-export class SalemmaScraper {
-    private config = salemmaConfig
+export class SalemmaScraper extends BaseScraper<SalemmaProduct, typeof salemmaConfig, SalemmaRouteKey> {
+    protected config = salemmaConfig
     private emptyUrls: string[] = []
-
-    get name() { return this.config.name }
-    get slug() { return this.config.slug }
 
     async scrapeRoute(routeKey: SalemmaRouteKey): Promise<ScraperResult<SalemmaProduct>> {
         const startTime = Date.now()
@@ -32,17 +37,19 @@ export class SalemmaScraper {
                     : `${this.config.baseUrl}${route.path}?page=${pageNum}`
 
                 try {
-                    const { products, nextPageExists } = await this.scrapePage(url, route.category)
+                    const html = await this.fetchPage(url, {
+                        'Cookie': 'salemma_location=1; salemma_modal_shown=1',
+                    })
+                    const { products, nextPageExists } = this.parseHtml(html, url, route.category)
                     allProducts.push(...products)
 
                     scraperLog.page(this.name, route.category, pageNum, products.length)
 
-                    // Track empty pages
                     if (products.length === 0) {
                         this.emptyUrls.push(url)
                         hasMorePages = false
                     } else {
-                        hasMorePages = nextPageExists
+                        hasMorePages = nextPageExists ?? false
                         pageNum++
                     }
 
@@ -65,22 +72,13 @@ export class SalemmaScraper {
             scraperLog.error(this.name, msg)
         }
 
-        return {
-            success: errors.length === 0,
-            data: allProducts,
-            errors,
-            scrapedAt: new Date(),
-            duration: Date.now() - startTime,
-        }
+        return this.createResult(allProducts, errors, startTime)
     }
 
     async scrapeAll(options?: {
         includeOfertas?: boolean
         onlyCategories?: SalemmaRouteKey[]
     }): Promise<ScraperResult<SalemmaProduct>> {
-        const startTime = Date.now()
-        const allProducts: SalemmaProduct[] = []
-        const allErrors: string[] = []
         this.emptyUrls = []
 
         const routeKeys = options?.onlyCategories ||
@@ -90,47 +88,7 @@ export class SalemmaScraper {
             ? routeKeys.filter(k => !k.startsWith('ofertas'))
             : routeKeys
 
-        const BATCH_SIZE = 3
-        const BATCH_DELAY_MS = 500
-
-        scraperLog.start(this.name, routesToScrape.length)
-        logger.info(`[${this.name}] Mode: ${BATCH_SIZE} in parallel, ${BATCH_DELAY_MS}ms between batches`)
-
-        // Process in batches of 3
-        for (let i = 0; i < routesToScrape.length; i += BATCH_SIZE) {
-            const batch = routesToScrape.slice(i, i + BATCH_SIZE)
-            const batchNum = Math.floor(i / BATCH_SIZE) + 1
-            const totalBatches = Math.ceil(routesToScrape.length / BATCH_SIZE)
-
-            scraperLog.batch(this.name, batchNum, totalBatches, batch)
-
-            // Execute batch in parallel
-            const results = await Promise.all(
-                batch.map(routeKey => this.scrapeRoute(routeKey))
-            )
-
-            // Add results
-            for (let j = 0; j < results.length; j++) {
-                const result = results[j]
-                const routeKey = batch[j]
-                allProducts.push(...result.data)
-                allErrors.push(...result.errors)
-                scraperLog.route(this.name, routeKey, result.data.length)
-            }
-
-            // Delay between batches (except the last one)
-            if (i + BATCH_SIZE < routesToScrape.length) {
-                await this.delay(BATCH_DELAY_MS)
-            }
-        }
-
-        return {
-            success: allErrors.length === 0,
-            data: allProducts,
-            errors: allErrors,
-            scrapedAt: new Date(),
-            duration: Date.now() - startTime,
-        }
+        return super.scrapeAll({ onlyCategories: routesToScrape })
     }
 
     async scrapeOfertas(): Promise<ScraperResult<SalemmaProduct>> {
@@ -139,26 +97,7 @@ export class SalemmaScraper {
         return this.scrapeAll({ onlyCategories: ofertasRoutes })
     }
 
-    async scrapePage(url: string, category: string): Promise<{ products: SalemmaProduct[]; nextPageExists: boolean }> {
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'es-ES,es;q=0.9',
-                // Cookie to bypass the modal/location popup
-                'Cookie': 'salemma_location=1; salemma_modal_shown=1',
-            },
-        })
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-        }
-
-        const html = await response.text()
-        return this.parseHtml(html, url, category)
-    }
-
-    parseHtml(html: string, sourceUrl: string, category: string): { products: SalemmaProduct[]; nextPageExists: boolean } {
+    parseHtml(html: string, sourceUrl: string, category: string): PageResult<SalemmaProduct> {
         const $ = cheerio.load(html)
         const products: SalemmaProduct[] = []
         const { selectors, parsePrice, parseDiscount, extractBarcode, buildFullUrl } = this.config
@@ -166,37 +105,30 @@ export class SalemmaScraper {
         $(selectors.productContainer).each((_, element) => {
             const $el = $(element)
 
-            // Combine brand + name
             const brand = $el.find(selectors.brand).text().trim()
             const productName = $el.find(selectors.name).text().trim()
             const name = brand && productName
                 ? `${brand} ${productName}`
                 : productName || brand
 
-            // Price
             const priceText = $el.find(selectors.price).text()
             const price = parsePrice(priceText)
 
             if (!name || !price) return
 
-            // URL
             const productPath = $el.find(selectors.url).attr('href')
             const fullUrl = buildFullUrl(this.config.baseUrl, productPath) || sourceUrl
 
-            // Image URL (from picture source srcset)
             const imageUrl = $el.find(selectors.image).attr(selectors.imageAttr) || undefined
 
-            // Extract barcode from image URL
             const barcode = extractBarcode(imageUrl) || undefined
 
-            // External ID
             const externalId = $el.find(selectors.externalId).attr('value') || undefined
 
-            // Discount
             const discountText = $el.find(selectors.discountPercent).text()
             const discountPercent = parseDiscount(discountText) || undefined
 
-            const product: SalemmaProduct = {
+            products.push({
                 name,
                 price,
                 discountPercent,
@@ -205,190 +137,50 @@ export class SalemmaScraper {
                 category,
                 externalId,
                 barcode,
-            }
-
-            products.push(product)
+            })
         })
 
-        // Check if next page exists
         const nextPageExists = $(selectors.nextPage).length > 0
 
         return { products, nextPageExists }
     }
 
-    async saveProducts(products: SalemmaProduct[]): Promise<{ saved: number; updated: number; skipped: number }> {
-        const store = await db.store.upsert({
-            where: { slug: this.slug },
-            update: { lastScrapedAt: new Date() },
-            create: {
-                name: this.name,
-                slug: this.slug,
-                type: 'SUPERMERCADO',
-                websiteUrl: this.config.baseUrl,
-                isActive: true,
-            },
-        })
-
-        let saved = 0
-        let updated = 0
-        let skipped = 0
-        const seenNames = new Set<string>()
-        const seenExternalIds = new Set<string>()
-
-        for (const product of products) {
-            const normalizedName = this.normalizeName(product.name)
-            const parsed = parseProductName(normalizedName)
-
-            // Skip duplicates by normalized name
-            if (seenNames.has(normalizedName)) {
-                skipped++
-                continue
-            }
-
-            // Skip duplicates by externalId (unique constraint in DB)
-            if (product.externalId && seenExternalIds.has(product.externalId)) {
-                skipped++
-                continue
-            }
-
-            seenNames.add(normalizedName)
-            if (product.externalId) seenExternalIds.add(product.externalId)
-
-            try {
-                const existing = await db.product.findUnique({
-                    where: {
-                        storeId_normalizedName: {
-                            storeId: store.id,
-                            normalizedName,
-                        },
-                    },
-                })
-
-                const dbProduct = await db.product.upsert({
-                    where: {
-                        storeId_normalizedName: {
-                            storeId: store.id,
-                            normalizedName,
-                        },
-                    },
-                    update: {
-                        name: product.name,
-                        baseNormalizedName: parsed.baseName,
-                        quantity: parsed.quantity,
-                        unit: parsed.unit,
-                        imageUrl: product.imageUrl,
-                        category: product.category,
-                        barcode: product.barcode,
-                        externalId: product.externalId,
-                        updatedAt: new Date(),
-                    },
-                    create: {
-                        name: product.name,
-                        normalizedName,
-                        baseNormalizedName: parsed.baseName,
-                        quantity: parsed.quantity,
-                        unit: parsed.unit,
-                        imageUrl: product.imageUrl,
-                        category: product.category,
-                        barcode: product.barcode,
-                        externalId: product.externalId,
-                        storeId: store.id,
-                    },
-                })
-
-                if (existing) {
-                    updated++
-                } else {
-                    saved++
-                }
-
-                await db.price.create({
-                    data: {
-                        price: product.price,
-                        sourceUrl: product.sourceUrl,
-                        productId: dbProduct.id,
-                        storeId: store.id,
-                    },
-                })
-
-            } catch (error) {
-                logger.error(`Error saving "${product.name}":`, error)
-                skipped++
-            }
-        }
-
-        return { saved, updated, skipped }
+    // Override to track skipped products
+    async saveProducts(products: SalemmaProduct[]): Promise<{ saved: number; updated: number }> {
+        return super.saveProducts(products)
     }
 
     getEmptyUrls(): string[] {
         return this.emptyUrls
-    }
-
-    private normalizeName(name: string): string {
-        return name
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z0-9\s]/g, '')
-            .replace(/\s+/g, ' ')
-            .trim()
-    }
-
-    private delay(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms))
     }
 }
 
 // CLI
 const isMainModule = import.meta.url === `file://${process.argv[1]}`
 if (isMainModule) {
-    const args = process.argv.slice(2)
+    const args = parseCliArgs(process.argv.slice(2))
     const scraper = new SalemmaScraper()
 
-    const onlyOfertas = args.includes('--ofertas')
-    const saveToDb = args.includes('--save')
-    const specificRoute = args.find(a => a.startsWith('--route='))?.split('=')[1] as SalemmaRouteKey | undefined
-
-    logger.box([
-        `🛒 Salemma Scraper`,
-        ``,
-        `   Mode: ${onlyOfertas ? 'Offers only' : specificRoute ? `Route: ${specificRoute}` : 'All categories'}`,
-        `   Save: ${saveToDb ? 'Yes' : 'No (use --save to save)'}`,
-    ].join('\n'))
+    showCliHeader('Salemma', args)
 
     let result: ScraperResult<SalemmaProduct>
 
-    if (onlyOfertas) {
+    if (args.onlyOfertas) {
         result = await scraper.scrapeOfertas()
-    } else if (specificRoute) {
-        result = await scraper.scrapeRoute(specificRoute)
+    } else if (args.specificRoute) {
+        result = await scraper.scrapeRoute(args.specificRoute as SalemmaRouteKey)
     } else {
         result = await scraper.scrapeAll()
     }
 
-    // Final summary
-    scraperLog.summary(scraper.name, {
-        total: result.data.length,
-        errors: result.errors.length,
-        duration: result.duration,
-    })
-
-    if (result.data.length > 0) {
+    showCliSummary(scraper.name, result, (products) => {
         logger.info('Examples:')
-        result.data.slice(0, 5).forEach(p => {
+        products.slice(0, 5).forEach(p => {
             const discount = p.discountPercent ? ` (${p.discountPercent}% OFF)` : ''
             const barcode = p.barcode ? ` [${p.barcode}]` : ''
-            logger.log(`  ${p.name}: ₲ ${p.price.toLocaleString()}${discount}${barcode}`)
+            logger.log(`  ${p.name}: ${p.price.toLocaleString()}${discount}${barcode}`)
         })
-    }
-
-    // Summary by category
-    const byCategory = result.data.reduce((acc, p) => {
-        acc[p.category] = (acc[p.category] || 0) + 1
-        return acc
-    }, {} as Record<string, number>)
-
-    scraperLog.categories(scraper.name, byCategory)
+    })
 
     // Show empty URLs if any
     const emptyUrls = scraper.getEmptyUrls()
@@ -400,14 +192,6 @@ if (isMainModule) {
         }
     }
 
-    if (saveToDb && result.data.length > 0) {
-        logger.start('Guardando en base de datos...')
-        const { saved, updated, skipped } = await scraper.saveProducts(result.data)
-        scraperLog.saved(scraper.name, saved, updated)
-        if (skipped > 0) {
-            logger.warn(`Skipped ${skipped} products (duplicates or errors)`)
-        }
-    }
-
+    await saveIfRequested(scraper, result.data, args.saveToDb)
     await db.$disconnect()
 }

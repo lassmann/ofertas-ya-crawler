@@ -7,15 +7,25 @@ import { FortisScraper } from '../scrapers/supermercados/fortis.js'
 import { StockScraper } from '../scrapers/supermercados/stock.js'
 import { BiggieScraper } from '../scrapers/supermercados/biggie.js'
 import { AreteScraper } from '../scrapers/supermercados/arete.js'
+import { SalemmaScraper } from '../scrapers/supermercados/salemma.js'
 import type { ScrapedProduct, ScraperResult } from '../types/index.js'
 
 interface Scraper<T extends ScrapedProduct> {
   name: string
   scrapeAll(): Promise<ScraperResult<T>>
   saveProducts(products: T[]): Promise<{ saved: number; updated: number }>
+  detectStaleProducts(): Promise<{ staleCount: number; staleProducts: Array<{ name: string; hoursSinceLastScrape: number }> }>
 }
 
-async function runScraper<T extends ScrapedProduct>(scraper: Scraper<T>): Promise<{ name: string; success: boolean; count: number; duration: number }> {
+interface ScraperResult2 {
+  name: string
+  success: boolean
+  count: number
+  duration: number
+  staleCount: number
+}
+
+async function runScraper<T extends ScrapedProduct>(scraper: Scraper<T>): Promise<ScraperResult2> {
   logger.info(`[${scraper.name}] Starting...`)
 
   try {
@@ -24,12 +34,16 @@ async function runScraper<T extends ScrapedProduct>(scraper: Scraper<T>): Promis
     if (result.success && result.data.length > 0) {
       logger.start(`[${scraper.name}] Saving ${result.data.length} products...`)
       await scraper.saveProducts(result.data)
+
+      // Detect stale products
+      const { staleCount } = await scraper.detectStaleProducts()
+
       logger.success(`[${scraper.name}] Completed in ${result.duration}ms`)
-      return { name: scraper.name, success: true, count: result.data.length, duration: result.duration }
+      return { name: scraper.name, success: true, count: result.data.length, duration: result.duration, staleCount }
     } else {
       logger.warn(`[${scraper.name}] No data or with errors`)
       result.errors.forEach((e: string) => logger.error(`  ${e}`))
-      return { name: scraper.name, success: false, count: 0, duration: result.duration }
+      return { name: scraper.name, success: false, count: 0, duration: result.duration, staleCount: 0 }
     }
   } catch (error) {
     logger.error(`[${scraper.name}] Fatal error:`, error)
@@ -53,6 +67,7 @@ async function main() {
     new StockScraper(),
     new BiggieScraper(),
     new AreteScraper(),
+    new SalemmaScraper(),
   ]
 
   // Run all scrapers in parallel
@@ -61,12 +76,13 @@ async function main() {
   )
 
   // Summary
-  const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length
+  const successfulResults = results
+    .filter((r): r is PromiseFulfilledResult<ScraperResult2> => r.status === 'fulfilled' && r.value.success)
+
+  const successful = successfulResults.length
   const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)).length
-  const totalProducts = results
-    .filter((r): r is PromiseFulfilledResult<{ name: string; success: boolean; count: number; duration: number }> =>
-      r.status === 'fulfilled' && r.value.success)
-    .reduce((sum, r) => sum + r.value.count, 0)
+  const totalProducts = successfulResults.reduce((sum, r) => sum + r.value.count, 0)
+  const totalStale = successfulResults.reduce((sum, r) => sum + r.value.staleCount, 0)
 
   const totalDuration = Date.now() - startTime
 
@@ -80,6 +96,25 @@ async function main() {
     '',
     `${new Date().toISOString()}`,
   ].join('\n'))
+
+  // Stale products report
+  if (totalStale > 0) {
+    logger.warn('')
+    logger.warn('⚠️  PRODUCTOS NO SCRAPEADOS (>24h):')
+    logger.warn('─'.repeat(40))
+    for (const r of successfulResults) {
+      if (r.value.staleCount > 0) {
+        logger.warn(`   ${r.value.name}: ${r.value.staleCount} productos`)
+      }
+    }
+    logger.warn('─'.repeat(40))
+    logger.warn(`   TOTAL: ${totalStale} productos stale`)
+    logger.warn('')
+  } else {
+    logger.success('')
+    logger.success('✅ Todos los productos fueron scrapeados recientemente')
+    logger.success('')
+  }
 
   await db.$disconnect()
 }

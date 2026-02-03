@@ -103,13 +103,23 @@ matchesRouter.get('/canonical/search', async (req, res) => {
       normalizedName: string
       category: string | null
       similarity: number
+      minPrice: number | null
     }[]>`
       SELECT
         cp.id,
         cp.name,
         cp."normalizedName",
         cp.category,
-        similarity(cp."normalizedName", ${normalizedQuery}) as similarity
+        similarity(cp."normalizedName", ${normalizedQuery}) as similarity,
+        (
+          SELECT MIN(p.price)
+          FROM "ProductMatch" pm
+          JOIN "Price" p ON p."productId" = pm."productId"
+          WHERE pm."canonicalProductId" = cp.id
+            AND p."scrapedAt" = (
+              SELECT MAX(p2."scrapedAt") FROM "Price" p2 WHERE p2."productId" = pm."productId"
+            )
+        ) as "minPrice"
       FROM "CanonicalProduct" cp
       WHERE cp."normalizedName" % ${normalizedQuery}
          OR cp.name ILIKE ${'%' + q + '%'}

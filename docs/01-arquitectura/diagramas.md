@@ -11,6 +11,7 @@ flowchart TB
         S4[Casa Rica]
         S5[Biggie]
         S6[Salemma]
+        S7[Arete]
     end
 
     subgraph Database["PostgreSQL"]
@@ -20,6 +21,7 @@ flowchart TB
         PM[ProductMatch]
         CP[CanonicalProduct]
         CA[CanonicalAlias]
+        FO[FeaturedOffer]
     end
 
     subgraph API["API REST"]
@@ -28,6 +30,8 @@ flowchart TB
         E3["/api/compare"]
         E4["/api/stores"]
         E5["/api/stats"]
+        E6["/api/featured"]
+        E7["/api/canonical"]
     end
 
     subgraph Frontend["Frontend React"]
@@ -35,6 +39,8 @@ flowchart TB
         U[Unmatched]
         M[Matched Products]
         C[Compare]
+        PG[Products]
+        AF[Admin Featured]
     end
 
     Scrapers -->|scrape & save| P
@@ -42,6 +48,7 @@ flowchart TB
     P --> PM
     PM --> CP
     CP --> CA
+    CP --> FO
     ST --> P
 
     Database --> API
@@ -82,6 +89,7 @@ erDiagram
         string barcode
         string externalId
         string imageUrl
+        boolean isHidden
         uuid storeId FK
     }
 
@@ -99,6 +107,7 @@ erDiagram
     CanonicalProduct {
         uuid id PK
         string name
+        string displayName
         string normalizedName UK
         string baseNormalizedName
         string brand
@@ -122,6 +131,17 @@ erDiagram
         string normalizedName UK
         uuid canonicalProductId FK
     }
+
+    FeaturedOffer {
+        uuid id PK
+        uuid canonicalProductId FK UK
+        int displayOrder
+        boolean isActive
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    CanonicalProduct ||--o| FeaturedOffer : "has one"
 ```
 
 ## Flujo de Scraping
@@ -271,6 +291,8 @@ flowchart TB
         UnmatchedProducts
         MatchedProducts
         Compare
+        Products
+        AdminFeatured
     end
 
     subgraph State

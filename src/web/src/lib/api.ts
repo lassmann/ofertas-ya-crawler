@@ -141,6 +141,7 @@ export interface CanonicalSearchResult {
   normalizedName: string
   category: string | null
   similarity: number
+  minPrice: number | null
 }
 
 export interface ProductListItem {

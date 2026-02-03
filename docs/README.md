@@ -49,6 +49,7 @@ npm run dev:full
   - [Casa Rica](./03-scrapers/scrapers/casarica.md)
   - [Biggie](./03-scrapers/scrapers/biggie.md)
   - [Salemma](./03-scrapers/scrapers/salemma.md)
+  - [Arete](./03-scrapers/scrapers/arete.md)
 
 ### [04 - API REST](./04-api/)
 - [Endpoints](./04-api/endpoints.md)
@@ -83,6 +84,7 @@ npm run dev:full
 | Casa Rica | `casarica` | Activo |
 | Biggie | `biggie` | Activo |
 | Salemma | `salemma` | Activo |
+| Arete | `arete` | Activo |
 
 ## Tecnologias Principales
 
@@ -92,6 +94,13 @@ npm run dev:full
 - **API**: Express.js
 - **Frontend**: React + Vite + TailwindCSS
 - **Matching**: pg_trgm (PostgreSQL extension)
+
+## Funcionalidades Principales
+
+- **Scraping de productos**: Extrae precios y datos de 7 supermercados paraguayos
+- **Sistema de Matching**: Identifica productos iguales en diferentes tiendas usando fuzzy matching
+- **Comparacion de Precios**: Muestra el precio mas barato entre todas las tiendas
+- **Ofertas Destacadas**: Sistema de administracion para destacar productos en la pagina principal
 
 ## Flujo General
 
@@ -106,4 +115,7 @@ Supermercados (web) --> Scrapers --> Products + Prices
                                           |
                                           v
                                    Comparacion de Precios
+                                          |
+                                          v
+                                   Featured Offers (Admin)
 ```

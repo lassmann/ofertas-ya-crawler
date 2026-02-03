@@ -8,6 +8,7 @@ Base URL: `http://localhost:3001/api`
 |--------|------|-------------|
 | GET | `/stores` | Lista de tiendas |
 | GET | `/stats` | Estadisticas del dashboard |
+| GET | `/health` | Health check del servidor |
 | GET | `/products/unmatched` | Productos sin match |
 | GET | `/products/matched` | Productos canonicos matcheados |
 | GET | `/products/categories` | Lista de categorias |
@@ -15,6 +16,12 @@ Base URL: `http://localhost:3001/api`
 | POST | `/matches` | Crear match manual |
 | POST | `/matches/canonical` | Crear producto canonico + match |
 | GET | `/compare/:canonicalId` | Comparar precios |
+| GET | `/featured` | Lista ofertas destacadas |
+| POST | `/featured` | Crear oferta destacada |
+| PATCH | `/featured/:id` | Actualizar oferta destacada |
+| PATCH | `/featured/reorder` | Reordenar ofertas |
+| DELETE | `/featured/:id` | Eliminar oferta destacada |
+| PATCH | `/canonical/:id` | Actualizar producto canonico |
 
 ---
 
@@ -342,3 +349,180 @@ Obtiene comparacion de precios de un producto canonico en todas las tiendas.
 **Notas:**
 - `stores` esta ordenado por precio ascendente (mas barato primero)
 - `cheapest` y `mostExpensive` son el primer y ultimo elemento de `stores`
+
+---
+
+## Health
+
+### GET /api/health
+
+Verifica que el servidor este funcionando.
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
+---
+
+## Featured Offers (Ofertas Destacadas)
+
+### GET /api/featured
+
+Lista ofertas destacadas con informacion de precios.
+
+**Query Parameters:**
+| Parametro | Tipo | Default | Descripcion |
+|-----------|------|---------|-------------|
+| `includeInactive` | boolean | false | Incluir ofertas desactivadas |
+
+**Response:**
+```json
+[
+  {
+    "id": "uuid",
+    "displayOrder": 0,
+    "isActive": true,
+    "createdAt": "2024-01-15T10:30:00Z",
+    "canonicalProduct": {
+      "id": "uuid",
+      "name": "Coca-Cola Original 2L",
+      "category": "bebidas",
+      "brand": "Coca-Cola",
+      "imageUrl": "https://..."
+    },
+    "storeCount": 5,
+    "minPrice": 14500,
+    "maxPrice": 18000,
+    "priceDifferencePercent": 24
+  }
+]
+```
+
+---
+
+### POST /api/featured
+
+Crea una nueva oferta destacada.
+
+**Request Body:**
+```json
+{
+  "canonicalProductId": "uuid-del-producto-canonico",
+  "displayOrder": 0
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "featured": {
+    "id": "uuid",
+    "canonicalProductId": "uuid",
+    "displayOrder": 0,
+    "isActive": true
+  }
+}
+```
+
+**Errores:**
+- `400`: canonicalProductId faltante o producto ya destacado
+- `404`: Producto canonico no encontrado
+
+---
+
+### PATCH /api/featured/:id
+
+Actualiza una oferta destacada.
+
+**Request Body:**
+```json
+{
+  "displayOrder": 1,
+  "isActive": false
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "featured": {
+    "id": "uuid",
+    "displayOrder": 1,
+    "isActive": false
+  }
+}
+```
+
+---
+
+### PATCH /api/featured/reorder
+
+Reordena multiples ofertas destacadas.
+
+**Request Body:**
+```json
+{
+  "items": [
+    { "id": "uuid-1", "displayOrder": 0 },
+    { "id": "uuid-2", "displayOrder": 1 },
+    { "id": "uuid-3", "displayOrder": 2 }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "success": true
+}
+```
+
+---
+
+### DELETE /api/featured/:id
+
+Elimina una oferta destacada.
+
+**Response:**
+```json
+{
+  "success": true,
+  "id": "uuid-eliminado"
+}
+```
+
+---
+
+## Canonical Products
+
+### PATCH /api/canonical/:id
+
+Actualiza un producto canonico (principalmente para cambiar displayName).
+
+**Request Body:**
+```json
+{
+  "displayName": "Nombre personalizado para mostrar"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "canonical": {
+    "id": "uuid",
+    "name": "Nombre original",
+    "displayName": "Nombre personalizado para mostrar"
+  }
+}
+```
+
+**Notas:**
+- Enviar `displayName` vacio o null para limpiar el nombre personalizado

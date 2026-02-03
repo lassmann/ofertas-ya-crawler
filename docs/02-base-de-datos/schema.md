@@ -55,6 +55,7 @@ model Product {
   barcode            String?                       // EAN/UPC
   externalId         String?                       // ID interno de la tienda
   imageUrl           String?
+  isHidden           Boolean  @default(false)      // Ocultar productos problematicos
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -71,6 +72,7 @@ model Product {
 - `baseNormalizedName`: Nombre SIN la cantidad/unidad. Ej: "coca cola original" (sin "2l"). Usado para matching mejorado.
 - `quantity` + `unit`: Medida extraida del nombre. Ej: 2 + "l" para "2L"
 - `barcode`: Codigo EAN/UPC. No es unique porque el mismo producto puede estar en multiples tiendas.
+- `isHidden`: Permite ocultar productos incorrectamente matcheados o problematicos sin eliminarlos.
 
 **Indices:**
 - `@@unique([storeId, normalizedName])`: Garantiza un producto unico por nombre normalizado por tienda
@@ -119,6 +121,7 @@ Representa UN producto real unico. Multiples `Product` de diferentes tiendas pue
 model CanonicalProduct {
   id                 String  @id @default(uuid())
   name               String                         // "Coca-Cola Original 2L"
+  displayName        String?                        // Nombre para mostrar al usuario (opcional)
   normalizedName     String  @unique                // "coca cola original 2l"
   baseNormalizedName String?                        // "coca cola original"
   brand              String?
@@ -128,6 +131,9 @@ model CanonicalProduct {
   primaryBarcode     String? @unique                // EAN/UPC principal
 }
 ```
+
+**Campos clave:**
+- `displayName`: Nombre personalizado para mostrar al usuario final. Si es null, se usa `name`.
 
 **Diferencia con Product:**
 - `Product`: Instancia de un producto en UNA tienda
@@ -195,6 +201,57 @@ Cuando se crea un match (fuzzy o manual), se guarda el `normalizedName` del Prod
 
 ---
 
+### FeaturedOffer (Oferta Destacada)
+
+Productos canonicos destacados que aparecen en la pagina principal.
+
+```prisma
+model FeaturedOffer {
+  id String @id @default(uuid())
+
+  canonicalProduct   CanonicalProduct @relation(fields: [canonicalProductId], references: [id])
+  canonicalProductId String           @unique  // Un producto solo puede destacarse una vez
+
+  displayOrder Int     @default(0)            // Orden de aparicion
+  isActive     Boolean @default(true)         // Activar/desactivar sin eliminar
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, displayOrder])
+}
+```
+
+**Campos clave:**
+- `canonicalProductId`: Relacion unica - cada producto canonico solo puede estar destacado una vez
+- `displayOrder`: Permite ordenar las ofertas destacadas en la UI
+- `isActive`: Permite desactivar temporalmente sin eliminar el registro
+
+---
+
+### PromotionDuplicate (Duplicados de Promociones)
+
+Detecta y registra posibles promociones duplicadas.
+
+```prisma
+model PromotionDuplicate {
+  id              String   @id @default(uuid())
+  promotionId1    String                        // Primera promocion
+  promotionId2    String                        // Segunda promocion
+  similarityScore Float                         // Score de similitud (0.0 - 1.0)
+  isSamePromotion Boolean?                      // null = sin confirmar
+  confirmedBy     String?                       // Usuario que confirmo
+  createdAt       DateTime @default(now())
+
+  @@unique([promotionId1, promotionId2])
+}
+```
+
+**Uso:**
+Detectar cuando la misma promocion bancaria aparece en multiples fuentes para evitar duplicados en la UI.
+
+---
+
 ## Diagrama de Relaciones
 
 ```
@@ -202,7 +259,7 @@ Store
   │
   ├──< Product >──┐
   │       │       │
-  │       │       ├── ProductMatch ──> CanonicalProduct
+  │       │       ├── ProductMatch ──> CanonicalProduct ──> FeaturedOffer
   │       │                                   │
   │       v                                   │
   └──< Price                                  └──< CanonicalAlias
