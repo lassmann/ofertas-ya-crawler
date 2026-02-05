@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { Prisma } from '../../../generated/prisma/client.js'
 import { db } from '../../lib/db.js'
 import { requireAuth } from '../middleware/auth.js'
+import { withCache, invalidateCache } from '../middleware/cache.js'
 
 export const productsRouter = Router()
 
@@ -180,7 +181,7 @@ productsRouter.get('/unmatched', async (req, res) => {
 })
 
 // GET /api/products/matched - Canonical products with matches in multiple stores
-productsRouter.get('/matched', async (req, res) => {
+productsRouter.get('/matched', withCache(), async (req, res) => {
   try {
     const { category, search, minStores = '2', page = '1', limit = '50', sort } = req.query
     const pageNum = parseInt(page as string, 10)
@@ -324,7 +325,7 @@ productsRouter.get('/matched', async (req, res) => {
 })
 
 // PATCH /api/products/:productId - Update product fields (like category)
-productsRouter.patch('/:productId', requireAuth, async (req, res) => {
+productsRouter.patch('/:productId', requireAuth, invalidateCache(['/api/products', '/api/stats']), async (req, res) => {
   try {
     const { productId } = req.params
     const { category } = req.body
@@ -356,7 +357,7 @@ productsRouter.patch('/:productId', requireAuth, async (req, res) => {
 })
 
 // GET /api/products/categories - List all unique categories
-productsRouter.get('/categories', async (_req, res) => {
+productsRouter.get('/categories', withCache(), async (_req, res) => {
   try {
     const categories = await db.product.findMany({
       where: { category: { not: null } },

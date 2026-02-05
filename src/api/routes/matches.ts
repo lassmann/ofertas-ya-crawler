@@ -2,11 +2,12 @@ import { Router } from 'express'
 import { db } from '../../lib/db.js'
 import { normalizeProductName } from '../../lib/matching/fuzzy-matcher.js'
 import { requireAuth } from '../middleware/auth.js'
+import { invalidateCache } from '../middleware/cache.js'
 
 export const matchesRouter = Router()
 
 // POST /api/matches - Create a manual match
-matchesRouter.post('/', requireAuth, async (req, res) => {
+matchesRouter.post('/', requireAuth, invalidateCache(['/api/products', '/api/stats', '/api/compare']), async (req, res) => {
   try {
     const { productId, canonicalProductId } = req.body
 
@@ -136,7 +137,7 @@ matchesRouter.get('/canonical/search', async (req, res) => {
 })
 
 // DELETE /api/matches/:productId - Remove a match
-matchesRouter.delete('/:productId', requireAuth, async (req, res) => {
+matchesRouter.delete('/:productId', requireAuth, invalidateCache(['/api/products', '/api/stats', '/api/compare']), async (req, res) => {
   try {
     const { productId } = req.params
     const hide = req.query.hide === 'true'
@@ -176,7 +177,7 @@ matchesRouter.delete('/:productId', requireAuth, async (req, res) => {
 })
 
 // POST /api/matches/canonical - Create a new canonical product and match
-matchesRouter.post('/canonical', requireAuth, async (req, res) => {
+matchesRouter.post('/canonical', requireAuth, invalidateCache(['/api/products', '/api/stats', '/api/compare']), async (req, res) => {
   try {
     const { productId, name, category, brand } = req.body
 

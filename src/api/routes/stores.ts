@@ -1,10 +1,11 @@
 import { Router } from 'express'
 import { db } from '../../lib/db.js'
+import { withCache } from '../middleware/cache.js'
 
 export const storesRouter = Router()
 
 // GET /api/stores - List all stores with product counts
-storesRouter.get('/', async (_req, res) => {
+storesRouter.get('/', withCache(), async (_req, res) => {
   try {
     const stores = await db.store.findMany({
       where: { isActive: true },

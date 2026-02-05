@@ -118,12 +118,21 @@ Si tenés un backup de tu BD local:
 
 ```bash
 # Copiar backup al servidor (desde tu maquina local)
-scp backup.sql root@tu-servidor:/opt/ofertas-ya/
-
-# En el servidor, restaurar el backup
-cd /opt/ofertas-ya
-docker compose exec -T postgres psql -U root ofertas_ya < backup.sql
+scp backup.sqlOC root@tu-servidor:/root/ofertas-ya-crawler/
 ```
+
+En el servidor, primero limpiar la BD y luego restaurar:
+
+```bash
+# Dropear y recrear la base de datos
+docker exec -it ofertas-ya-crawler-postgres-1 psql -U root -d postgres -c "DROP DATABASE ofertas_ya;"
+docker exec -it ofertas-ya-crawler-postgres-1 psql -U root -d postgres -c "CREATE DATABASE ofertas_ya;"
+
+# Restaurar el backup
+docker exec -i ofertas-ya-crawler-postgres-1 psql -U root -d ofertas_ya < backup.sqlOC
+```
+
+Nota: Verificar nombre del container con `docker ps` si es diferente.
 
 ### 12. Ejecutar primer scraping
 
@@ -154,14 +163,23 @@ pm2 list
 # Ver estadisticas de la BD
 npm run stats
 
-# Verificar API
-curl localhost:3001/api/health
+# Verificar API (directo)
+curl http://localhost:3001/api/health
+
+# Verificar API (via nginx puerto 80)
+curl http://localhost/api/health
+
+# Verificar API (desde IP publica)
+curl http://TU_IP_PUBLICA/api/health
 
 # Ver procesos PM2
 pm2 list
 
 # Ver proxima ejecucion del scraper
 pm2 describe ofertas-ya-scraper
+
+# Verificar nginx
+systemctl status nginx
 ```
 
 ### Verificar autenticacion
@@ -279,10 +297,12 @@ pm2 restart all
 
 ```bash
 # Backup manual
-docker compose exec -T postgres pg_dump -U root ofertas_ya > backup.sql
+docker exec ofertas-ya-crawler-postgres-1 pg_dump -U root ofertas_ya > backup.sql
 
-# Restaurar desde backup
-docker compose exec -T postgres psql -U root ofertas_ya < backup.sql
+# Restaurar desde backup (limpiar primero)
+docker exec -it ofertas-ya-crawler-postgres-1 psql -U root -d postgres -c "DROP DATABASE ofertas_ya;"
+docker exec -it ofertas-ya-crawler-postgres-1 psql -U root -d postgres -c "CREATE DATABASE ofertas_ya;"
+docker exec -i ofertas-ya-crawler-postgres-1 psql -U root -d ofertas_ya < backup.sql
 ```
 
 ## Troubleshooting

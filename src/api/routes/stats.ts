@@ -1,10 +1,11 @@
 import { Router } from 'express'
 import { db } from '../../lib/db.js'
+import { withCache } from '../middleware/cache.js'
 
 export const statsRouter = Router()
 
 // GET /api/stats/price-differences - Paginated price differences
-statsRouter.get('/price-differences', async (req, res) => {
+statsRouter.get('/price-differences', withCache(), async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string) || 1)
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 10))
@@ -104,7 +105,7 @@ statsRouter.get('/price-differences', async (req, res) => {
 })
 
 // GET /api/stats - Dashboard statistics
-statsRouter.get('/', async (_req, res) => {
+statsRouter.get('/', withCache(), async (_req, res) => {
   try {
     // Get counts in parallel
     const [

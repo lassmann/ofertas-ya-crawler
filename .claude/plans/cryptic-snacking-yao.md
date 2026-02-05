@@ -211,30 +211,154 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
 ---
 
-## Plan de Migración (Gradual)
+## Plan de Migración Gradual (Seleccionado)
 
-### Fase 1: Extraer utilidades comunes
-1. Crear `src/scrapers/core/utils.ts` con `normalizeName`, `delay`
-2. Crear `src/scrapers/core/ProductSaver.ts`
-3. Migrar scrapers existentes uno a uno
+### Fase 1: Crear core sin romper nada existente
 
-### Fase 2: Clase base para HTML scrapers
-1. Crear `HtmlScraper` extends `BaseScraper`
-2. Migrar CasaRica y Areté primero (son casi idénticos)
+**Archivos a crear:**
 
-### Fase 3: CLI genérico
-1. Crear `runScraperCLI()`
-2. Reemplazar CLI blocks duplicados
+```
+src/scrapers/core/
+├── index.ts                    # Re-exports
+├── types.ts                    # Tipos compartidos
+├── utils.ts                    # normalizeName, delay, slugify
+├── ProductSaver.ts             # Clase para guardar productos
+├── BatchProcessor.ts           # Lógica de batches
+└── cli.ts                      # CLI genérico
+```
 
-### Fase 4: Sistema de paginadores
-1. Implementar paginadores como estrategias
-2. Hacer scrapeRoute() parte del core
+**Paso 1.1: utils.ts**
+```typescript
+export function normalizeName(name: string): string { /* ... */ }
+export function delay(ms: number): Promise<void> { /* ... */ }
+export function slugify(text: string): string { /* ... */ }
+```
+
+**Paso 1.2: ProductSaver.ts**
+```typescript
+export class ProductSaver {
+  constructor(private storeSlug: string, private storeName: string, private baseUrl: string) {}
+
+  async save(products: ScrapedProduct[]): Promise<{ saved: number; updated: number }> {
+    // Lógica extraída de saveProducts()
+  }
+}
+```
+
+**Paso 1.3: BatchProcessor.ts**
+```typescript
+export async function processInBatches<TRouteKey extends string, TProduct>(
+  routeKeys: TRouteKey[],
+  scrapeRoute: (key: TRouteKey) => Promise<ScraperResult<TProduct>>,
+  options?: { batchSize?: number; delayMs?: number }
+): Promise<ScraperResult<TProduct>> { /* ... */ }
+```
+
+**Paso 1.4: cli.ts**
+```typescript
+export interface ScraperCLI<TRouteKey> {
+  name: string
+  scrapeRoute(key: TRouteKey): Promise<ScraperResult<any>>
+  scrapeAll(options?: any): Promise<ScraperResult<any>>
+  saveProducts(products: any[]): Promise<{ saved: number; updated: number }>
+}
+
+export async function runScraperCLI<TRouteKey extends string>(
+  scraper: ScraperCLI<TRouteKey>,
+  args: string[],
+  routeKeys: TRouteKey[]
+): Promise<void> { /* ... */ }
+```
+
+### Fase 2: Migrar un scraper como prueba (Areté)
+
+Areté es el más nuevo, así que es el candidato ideal para probar la nueva arquitectura:
+
+```typescript
+// src/scrapers/supermercados/arete.ts (migrado)
+import { normalizeName, delay } from '../core/utils'
+import { ProductSaver } from '../core/ProductSaver'
+import { processInBatches } from '../core/BatchProcessor'
+import { runScraperCLI } from '../core/cli'
+
+export class AreteScraper {
+  private saver = new ProductSaver('arete', 'Areté', 'https://www.arete.com.py')
+
+  // scrapeAll() ahora usa processInBatches()
+  async scrapeAll(options?: { onlyOfertas?: boolean }) {
+    const routeKeys = Object.keys(areteConfig.routes) as AreteRouteKey[]
+    const result = await processInBatches(routeKeys, (k) => this.scrapeRoute(k))
+
+    if (options?.onlyOfertas) {
+      result.data = result.data.filter(p => p.oldPrice !== undefined)
+    }
+    return result
+  }
+
+  // saveProducts() ahora delega al ProductSaver
+  async saveProducts(products: AreteProduct[]) {
+    return this.saver.save(products)
+  }
+
+  // parseHtml() sigue siendo específico de Areté
+  parseHtml(html: string, sourceUrl: string, category: string) { /* ... */ }
+}
+
+// CLI reducido a 1 línea
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runScraperCLI(new AreteScraper(), process.argv.slice(2), Object.keys(areteConfig.routes))
+}
+```
+
+### Fase 3: Migrar scrapers similares (CasaRica)
+
+CasaRica y Areté comparten la misma estructura HTML (WooCommerce). Migrar CasaRica usando el mismo patrón.
+
+### Fase 4: Crear HtmlScraper base
+
+Una vez que Areté y CasaRica funcionen, extraer la lógica común a una clase base:
+
+```typescript
+export abstract class HtmlScraper<TProduct extends ScrapedProduct, TRouteKey extends string> {
+  protected abstract parseHtml($: CheerioAPI, sourceUrl: string, category: string): TProduct[]
+  protected abstract get config(): ScraperConfig<TRouteKey>
+
+  // Todo lo demás es heredado
+  async scrapeAll() { /* ... */ }
+  async scrapeRoute(routeKey: TRouteKey) { /* ... */ }
+  async saveProducts(products: TProduct[]) { /* ... */ }
+}
+```
+
+### Fase 5: Migrar el resto
+
+Orden sugerido:
+1. **Stock** - Similar a CasaRica (HTML + next link)
+2. **Superseis** - HTML con paginación query param
+3. **Fortis** - HTML con cookies
+4. **Biggie** - API JSON (necesita ApiScraper base diferente)
+
+---
+
+## Archivos a Modificar/Crear
+
+| Archivo | Acción |
+|---------|--------|
+| `src/scrapers/core/index.ts` | Crear |
+| `src/scrapers/core/types.ts` | Crear |
+| `src/scrapers/core/utils.ts` | Crear |
+| `src/scrapers/core/ProductSaver.ts` | Crear |
+| `src/scrapers/core/BatchProcessor.ts` | Crear |
+| `src/scrapers/core/cli.ts` | Crear |
+| `src/scrapers/supermercados/arete.ts` | Migrar primero |
 
 ---
 
 ## Verificación
 
-1. Correr tests existentes después de cada fase
-2. Ejecutar cada scraper en modo dry-run
-3. Comparar output antes/después para validar parsing
+Después de cada fase:
+1. `npm run scrape:arete -- --route=lacteos` (dry-run)
+2. `npm run scrape:arete:save -- --route=panaderia` (con guardado)
+3. Comparar output antes/después
+4. Verificar en `npm run db:studio` que los datos se guardan igual
 

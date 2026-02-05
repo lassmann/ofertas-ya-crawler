@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import { db } from '../lib/db.js'
 import { logger } from '../lib/logger'
+import { cacheService } from '../lib/cache.js'
 import { SuperseisScraper } from '../scrapers/supermercados/superseis.js'
 import { CasaRicaScraper } from '../scrapers/supermercados/casarica.js'
 import { FortisScraper } from '../scrapers/supermercados/fortis.js'
@@ -147,6 +148,10 @@ async function main() {
   } else {
     logger.success('✅ No hay productos nuevos para procesar')
   }
+
+  // Clear API cache after scraping
+  cacheService.clear()
+  logger.success('✅ API cache cleared')
 
   await db.$disconnect()
 }

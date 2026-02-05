@@ -1,11 +1,12 @@
 import { Router } from 'express'
 import { db } from '../../lib/db.js'
 import { requireAuth } from '../middleware/auth.js'
+import { withCache, invalidateCache } from '../middleware/cache.js'
 
 export const featuredRouter = Router()
 
 // GET /api/featured - List all featured offers
-featuredRouter.get('/', async (req, res) => {
+featuredRouter.get('/', withCache(), async (req, res) => {
   try {
     const includeInactive = req.query.includeInactive === 'true'
 
@@ -87,7 +88,7 @@ featuredRouter.get('/', async (req, res) => {
 })
 
 // POST /api/featured - Create a featured offer
-featuredRouter.post('/', requireAuth, async (req, res) => {
+featuredRouter.post('/', requireAuth, invalidateCache(['/api/featured']), async (req, res) => {
   try {
     const { canonicalProductId, displayOrder } = req.body
 
@@ -145,7 +146,7 @@ featuredRouter.post('/', requireAuth, async (req, res) => {
 })
 
 // PATCH /api/featured/:id - Update a featured offer
-featuredRouter.patch('/:id', requireAuth, async (req, res) => {
+featuredRouter.patch('/:id', requireAuth, invalidateCache(['/api/featured']), async (req, res) => {
   try {
     const { id } = req.params
     const { displayOrder, isActive } = req.body
@@ -181,7 +182,7 @@ featuredRouter.patch('/:id', requireAuth, async (req, res) => {
 })
 
 // PATCH /api/featured/reorder - Reorder multiple featured offers
-featuredRouter.patch('/reorder', requireAuth, async (req, res) => {
+featuredRouter.patch('/reorder', requireAuth, invalidateCache(['/api/featured']), async (req, res) => {
   try {
     const { items } = req.body
 
@@ -207,7 +208,7 @@ featuredRouter.patch('/reorder', requireAuth, async (req, res) => {
 })
 
 // DELETE /api/featured/:id - Delete a featured offer
-featuredRouter.delete('/:id', requireAuth, async (req, res) => {
+featuredRouter.delete('/:id', requireAuth, invalidateCache(['/api/featured']), async (req, res) => {
   try {
     const { id } = req.params
 
